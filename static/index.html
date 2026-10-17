@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#111418">
+  <title>Phone Wheel</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="rotate-hint">Rotate your phone to landscape</div>
+
+  <main id="controller">
+    <header id="topbar">
+      <span id="status" class="status" data-state="connecting">connecting</span>
+      <span id="angle-readout">0°</span>
+      <span class="spacer"></span>
+      <button class="tool" id="recenter" type="button">Center</button>
+      <button class="tool" id="open-settings" type="button">Settings</button>
+      <button class="tool" id="fullscreen" type="button">Fullscreen</button>
+    </header>
+
+    <section id="wheel-zone">
+      <button class="btn paddle" data-button="0" type="button">Shift −</button>
+      <div id="wheel">
+        <svg viewBox="-100 -100 200 200" aria-hidden="true">
+          <circle class="rim" r="88" />
+          <circle class="rim-inner" r="74" />
+          <path class="spoke" d="M -74 6 L -22 14 L 22 14 L 74 6 L 74 -6 L 22 -6 L -22 -6 L -74 -6 Z" />
+          <path class="spoke" d="M -10 20 L -8 74 L 8 74 L 10 20 Z" />
+          <circle class="hub" r="24" />
+          <rect class="marker" x="-4" y="-98" width="8" height="22" rx="3" />
+        </svg>
+      </div>
+      <button class="btn paddle" data-button="1" type="button">Shift +</button>
+    </section>
+
+    <section id="buttons">
+      <button class="btn" data-button="2" type="button">Handbrake</button>
+      <button class="btn" data-button="3" type="button">Horn</button>
+      <button class="btn" data-button="4" type="button">Lights</button>
+      <button class="btn" data-button="5" type="button">Camera</button>
+      <button class="btn" data-button="6" type="button">Look back</button>
+      <button class="btn" data-button="7" type="button">Wipers</button>
+      <button class="btn" data-button="8" type="button">Ignition</button>
+      <button class="btn" data-button="9" type="button">Hazard</button>
+      <button class="btn" data-button="10" type="button">Map</button>
+      <button class="btn" data-button="11" type="button">Pause</button>
+    </section>
+
+    <section id="pedals">
+      <div class="pedal" data-pedal="c"><div class="fill"></div><span>Clutch</span></div>
+      <div class="pedal" data-pedal="b"><div class="fill"></div><span>Brake</span></div>
+      <div class="pedal" data-pedal="t"><div class="fill"></div><span>Gas</span></div>
+    </section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>Settings</h2>
+      <label>
+        Wheel rotation <output id="range-value">900°</output>
+        <input id="range" type="range" min="180" max="1440" step="90" value="900">
+      </label>
+      <label class="check">
+        <input id="autocenter" type="checkbox">
+        Spring back to center when released
+      </label>
+      <label class="check">
+        <input id="haptics" type="checkbox" checked>
+        Vibrate on button press
+      </label>
+      <div class="vibration-test">
+        <span>Test vibration:</span>
+        <button type="button" class="secondary" data-vibrate-ms="30">30 ms</button>
+        <button type="button" class="secondary" data-vibrate-ms="100">100 ms</button>
+        <button type="button" class="secondary" data-vibrate-ms="300">300 ms</button>
+        <button type="button" class="secondary" data-vibrate-ms="1000">1 s</button>
+        <button type="button" class="secondary" data-vibrate-ms="3000">3 s</button>
+      </div>
+      <div class="vibration-test">
+        <span id="vibration-result"></span>
+      </div>
+      <button type="submit">Done</button>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
