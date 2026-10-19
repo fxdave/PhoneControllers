@@ -26,9 +26,6 @@ device a plugged-in wheel is. No app on the phone, no driver on the PC.
   <img src="docs/screenshots/phone-portrait.png" width="22%" alt="The phone page in portrait">
 </p>
 
-Everything is set up on the PC, in an app that shows what the game gets, live. You never
-have to configure a pedal while it's in your hand.
-
 ## Which games
 
 Tested with **Rigs of Rods**, which the app sets up in one click. Other games would need the
