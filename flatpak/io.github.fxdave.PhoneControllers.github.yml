@@ -1,0 +1,42 @@
+# Builds Phone Controllers from the GitHub repository (the main branch) instead of this
+# working copy, so it also works in a sandboxed build:
+#
+#   flatpak run --filesystem=$PWD org.flatpak.Builder --user --install --sandbox \
+#       --install-deps-from=flathub --force-clean build-dir \
+#       flatpak/io.github.fxdave.PhoneControllers.github.yml
+#
+# For your own builds only. It was written with an AI assistant, and Flathub doesn't accept
+# AI-generated or AI-assisted manifests, so it must not be submitted to Flathub.
+id: io.github.fxdave.PhoneControllers
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: phone-controllers
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # /dev/uinput creates the virtual wheel; /dev/input shows which games have it open.
+  - --device=all
+  # Keep the screen awake while phones drive (the portal covers GNOME and KDE; this covers
+  # idle daemons such as hypridle and KDE's).
+  - --talk-name=org.freedesktop.ScreenSaver
+  # One-click Rigs of Rods setup (input map, force feedback).
+  - --filesystem=~/.rigsofrods/config:create
+modules:
+  - python-deps.json
+  - name: phone-controllers
+    buildsystem: simple
+    build-commands:
+      - install -d ${FLATPAK_DEST}/share/phone-controllers
+      - cp -r phonecontrollers static games ${FLATPAK_DEST}/share/phone-controllers/
+      - install -Dm755 data/phone-controllers.sh ${FLATPAK_DEST}/bin/phone-controllers
+      - install -Dm644 data/${FLATPAK_ID}.desktop -t ${FLATPAK_DEST}/share/applications
+      - install -Dm644 data/${FLATPAK_ID}.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
+      - install -Dm644 data/icons/${FLATPAK_ID}.svg -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+    sources:
+      - type: git
+        url: https://github.com/fxdave/PhoneControllers.git
+        branch: main

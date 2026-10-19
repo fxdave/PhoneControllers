@@ -17,6 +17,13 @@
 
 4. Commit, tag and push: `git tag v0.1.0 && git push origin main v0.1.0`.
 
+## Building from GitHub
+
+`flatpak/io.github.fxdave.PhoneControllers.github.yml` builds the `main` branch from GitHub
+instead of the working copy, so it also works in a sandboxed build (the command is at its
+top). The Flathub linter flags its filename and its branch source; both are Flathub
+submission rules, and this manifest isn't for Flathub.
+
 ## Flathub
 
 The app isn't on Flathub. A submission has to follow Flathub's
