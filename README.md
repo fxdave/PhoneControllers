@@ -34,9 +34,9 @@ have to configure a pedal while it's in your hand.
 
 ## Which games
 
-So far it has only been tried with **Rigs of Rods**, which the app sets up in one click.
-Other games that accept a joystick or wheel should be able to use it, but none has been
-tested yet. If you try one, an issue saying whether it worked is very welcome.
+Tested with **Rigs of Rods**, which the app sets up in one click. Other games would need the
+controls bound in their own settings, and some only accept specific wheel models or gamepads,
+so they may not see it at all. None has been tried yet; reports are welcome.
 
 > **Honest note:** this is vibecoded, built quickly with an AI assistant, and doesn't chase
 > perfection. A phone isn't the perfect tool for the job either. It's meant to be good enough
