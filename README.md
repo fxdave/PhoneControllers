@@ -15,6 +15,11 @@ Made for practising driving in simulators (Rigs of Rods, BeamNG.drive, City Car 
 Truck Simulator) as much as for games: there's a real clutch, a turn signal lever that cancels
 itself after the turn, and a sequential gear lever.
 
+> **A note on expectations:** this project is vibecoded, built quickly with an AI assistant,
+> and it doesn't aim for perfection. A phone isn't the perfect tool for the job either: no
+> real force on your hands, no pedal under your foot, sensors that drift. It's meant to be
+> good enough and fun. Issues and pull requests are welcome all the same.
+
 ## What it does
 
 - **Nothing to install on the phone.** Any phone with a browser works. Scan the QR code in the
