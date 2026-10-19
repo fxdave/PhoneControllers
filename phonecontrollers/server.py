@@ -514,7 +514,7 @@ class Server:
             device = create_device()
         except (OSError, UInputError) as error:
             self.on_event("error", f"Can't create the virtual device: {error}. "
-                                   "See the README section on /dev/uinput permission.")
+                                   "See \"If the app can't create the wheel\" in the README.")
             self.log(f"can't create the virtual device: {error}")
             return
         self.wheel = Wheel(device, self.config["curves"]["post"])
