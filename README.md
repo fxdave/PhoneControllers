@@ -11,15 +11,21 @@ device a plugged-in wheel is. No app on the phone, no driver on the PC.
 
 ## Features
 
-- Steering wheel: drag it with your thumb, or hold the phone and turn it (gyro)
-- Analog gas, brake and clutch: slide a finger, tilt the phone, or cover its back camera
-- Turn signal lever that cancels after the turn, and a sequential gear lever
-- Ten buttons with names you choose
-- Force feedback from the game shown on the wheel; rumble vibrates the phone
-- Look around by turning the phone to the side (Rigs of Rods)
-- Several phones at once, for example one as the wheel and one as pedals
-- Move, resize and remove any control on the phone
-- Desktop app with a live view of what the game gets; all tuning happens there
+- **No app on the phone.** Scan a QR code and the phone becomes a wheel, pedals, gear lever
+  and turn signals.
+- **Force feedback.** When a game sends it, it turns the wheel on screen, and rumble
+  vibrates the phone.
+- **Several phones.** One as the wheel, one on the floor as pedals.
+- **Two ways to steer.** Drag the wheel with your thumb, or hold the phone and turn it like
+  a real wheel.
+- **Look around.** Turn the phone to the side and the camera looks out the side window
+  (Rigs of Rods for now).
+- **Three ways to press a pedal.** Slide a finger, tilt the phone, or cover its back camera.
+- **Driving details.** A clutch with a bite point, indicators that cancel after the turn,
+  and a gear lever.
+- **Your layout.** Move, resize and remove any control on the phone.
+- **Set up on the PC.** A desktop app shows what the game gets, live, and holds every
+  setting.
 
 <p align="center">
   <img src="docs/screenshots/dark-home.png" width="62%" alt="The desktop app: a live cockpit with the wheel, levers and pedals, the connected phones and the game using the wheel">
