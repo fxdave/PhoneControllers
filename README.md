@@ -222,6 +222,10 @@ Test it with `jstest-gtk`, `evtest`, `fftest`, or Steam's controller settings.
 
 - If a phone disconnects or its page goes to the background, everything that phone holds is
   released, so the gas never sticks.
+- While a phone is connected, the PC doesn't start the screen saver, turn the screen off or
+  suspend, since driving with a phone never touches the keyboard or mouse. When the last phone
+  leaves, or the app stops or is killed, that's lifted again. Turn it off under **Connection**
+  in the app's menu.
 - Phones reload by themselves when the page is updated, as soon as no finger is on the screen.
 - Vibration works in Chrome and Samsung Internet on Android, not in Firefox or on iOS. Android
   drops short browser vibrations while **Touch feedback** is off (Settings → Sound &

@@ -36,6 +36,11 @@ Follow [Flathub's submission guide](https://docs.flathub.org/docs/for-app-author
      narrower device permission covers, and it watches `/dev/input` to see which game opened
      the wheel.
    - `--share=network`: phones connect to the app's web server on the local network.
+   - `--talk-name=org.freedesktop.ScreenSaver` and
+     `--system-talk-name=org.freedesktop.login1`: phones aren't keyboard or mouse input, so
+     the app asks the idle daemon (and logind's idle inhibitor, which most Wayland idle
+     daemons honour) not to blank the screen or suspend while a phone is connected. The
+     portal's Inhibit covers GNOME and KDE.
    - `--filesystem=~/.rigsofrods/config:create`: one-click Rigs of Rods setup (input map and
      force feedback settings).
 

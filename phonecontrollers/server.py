@@ -19,6 +19,7 @@ from aiohttp import WSMsgType, web
 from evdev import UInputError
 
 from . import config as settings
+from .inhibit import IdleInhibitor
 from .device import (
     AXES, LOOK_RESET_BIT, ForceFeedback, LookAround, Wheel, create_device, look_target,
     parse_state,
@@ -175,6 +176,8 @@ class Server:
         self._resync_handles: list[asyncio.TimerHandle] = []
         self._last_forces: dict | None = None
         self._phone_keys = itertools.count(1)
+        self.inhibitor = IdleInhibitor(self.log)
+        self._awake_lock = asyncio.Lock()
         self.look = LookAround()
         self._programs_task: asyncio.Future | None = None
         self._programs_dirty = False
@@ -187,6 +190,18 @@ class Server:
 
     def emit_phones(self) -> None:
         self.on_event("phones", [phone.describe() for phone in self.phones.values()])
+        asyncio.ensure_future(self.keep_awake())
+
+    async def keep_awake(self) -> None:
+        """Phones aren't keyboard or mouse input: without this the screen saver kicks in, or
+        the PC suspends, in the middle of a drive."""
+        async with self._awake_lock:
+            want = bool(self.phones) and self.config["server"]["keepAwake"] and \
+                self.status.get("running", False)
+            if want != self.inhibitor.active:
+                await asyncio.to_thread(
+                    self.inhibitor.inhibit if want else self.inhibitor.release,
+                    *(["A phone is driving"] if want else []))
 
     async def send_all(self, payload: dict) -> None:
         for ws in list(self.phones):
@@ -201,6 +216,7 @@ class Server:
         if self.wheel:
             self.wheel.set_curves(config["curves"]["post"])
         asyncio.ensure_future(self.send_all({"config": settings.for_phones(config)}))
+        asyncio.ensure_future(self.keep_awake())
 
     # ---------- the device ----------
 
@@ -566,6 +582,8 @@ class Server:
                 with contextlib.suppress(Exception):
                     await ws.close()
             await runner.cleanup()
+            async with self._awake_lock:
+                await asyncio.to_thread(self.inhibitor.release)
             device.close()
             self.status = {"running": False}
             self.on_event("status", self.status)

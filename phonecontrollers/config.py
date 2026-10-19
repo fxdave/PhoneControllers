@@ -87,6 +87,7 @@ DEFAULTS = {
         "outgauge": True,          # listen for OutGauge telemetry from games
         "outgaugePort": 4444,
         "autostart": True,         # desktop app starts the server when it opens
+        "keepAwake": True,         # no screen saver or suspend while a phone is connected
     },
 }
 

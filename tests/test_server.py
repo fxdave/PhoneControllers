@@ -41,7 +41,7 @@ def free_port() -> int:
 
 async def started_server(events):
     settings = config.sanitize({"server": {"port": free_port(), "https": False,
-                                           "outgauge": False}})
+                                           "outgauge": False, "keepAwake": False}})
     started = asyncio.Event()
 
     def on_event(kind, data):

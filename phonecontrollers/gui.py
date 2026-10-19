@@ -915,13 +915,16 @@ class Window(Adw.ApplicationWindow):
 
     def build_connection(self) -> Adw.NavigationPage:
         group = Adw.PreferencesGroup(
-            description="Changes here apply when the server restarts.")
+            description="Address and port changes apply when the server restarts.")
         group.add(self.spin(("server", "port"), "Address port", "For touch-only phones",
                             1, 65535, 1))
         group.add(self.switch(("server", "https"), "Secure address",
                               "Browsers only give tilt sensors to secure (https) pages"))
         group.add(self.spin(("server", "httpsPort"), "Secure address port", "", 1, 65535, 1))
         group.add(self.switch(("server", "autostart"), "Start the server when the app opens"))
+        group.add(self.switch(("server", "keepAwake"), "Keep the screen awake",
+                              "No screen saver, screen off or suspend while a phone is "
+                              "connected"))
         telemetry = Adw.PreferencesGroup(
             title="Game telemetry",
             description="Live for Speed, BeamNG.drive and others can send OutGauge data. Then "
@@ -977,7 +980,13 @@ class App(Adw.Application):
             self.start_server()
 
     def needs_restart(self) -> bool:
-        return self.runner.running and self.started_with != self.config["server"]
+        # Starting with the app and keeping the screen awake apply without a restart.
+        def connection(options):
+            return {key: value for key, value in options.items()
+                    if key not in ("autostart", "keepAwake")}
+
+        return self.runner.running and connection(self.started_with) != connection(
+            self.config["server"])
 
     def config_changed(self) -> None:
         config = copy.deepcopy(self.config)
@@ -1024,6 +1033,8 @@ class App(Adw.Application):
 
 def main() -> int:
     app = App()
-    # Ctrl+C in a terminal quits cleanly, releasing the virtual device.
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, 2, lambda: app.quit() or False)
+    # Ctrl+C in a terminal, or a plain kill, quits cleanly: the virtual device is released
+    # and the screen may go idle again.
+    for signum in (2, 15):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, lambda: app.quit() or False)
     return app.run(sys.argv)

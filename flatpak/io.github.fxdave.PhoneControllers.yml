@@ -14,6 +14,10 @@ finish-args:
   - --device=dri
   # /dev/uinput creates the virtual wheel; /dev/input shows which games have it open.
   - --device=all
+  # Keep the screen awake while phones drive (the portal covers GNOME and KDE; these two
+  # cover idle daemons such as hypridle and swayidle).
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --system-talk-name=org.freedesktop.login1
   # One-click Rigs of Rods setup (input map, force feedback).
   - --filesystem=~/.rigsofrods/config:create
 modules:
