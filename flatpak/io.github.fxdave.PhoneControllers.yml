@@ -1,0 +1,38 @@
+# Build and install locally:
+#   flatpak-builder --user --install --force-clean build-dir flatpak/io.github.fxdave.PhoneControllers.yml
+# Regenerate python-deps.json after updating the venv: .venv/bin/python flatpak/generate-python-deps.py
+id: io.github.fxdave.PhoneControllers
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+command: phone-controllers
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # /dev/uinput creates the virtual wheel; /dev/input shows which games have it open.
+  - --device=all
+  # One-click Rigs of Rods setup (input map, force feedback).
+  - --filesystem=~/.rigsofrods/config:create
+modules:
+  - python-deps.json
+  - name: phone-controllers
+    buildsystem: simple
+    build-commands:
+      - install -d ${FLATPAK_DEST}/share/phone-controllers
+      - cp -r phonecontrollers static games ${FLATPAK_DEST}/share/phone-controllers/
+      - install -Dm755 data/phone-controllers.sh ${FLATPAK_DEST}/bin/phone-controllers
+      - install -Dm644 data/${FLATPAK_ID}.desktop -t ${FLATPAK_DEST}/share/applications
+      - install -Dm644 data/${FLATPAK_ID}.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
+      - install -Dm644 data/icons/${FLATPAK_ID}.svg -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .venv
+          - build-dir
+          - .flatpak-builder
+          - certs
+          - tests

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.fxdave.PhoneControllers</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Phone Controllers</name>
+  <summary>Turn phones into a wheel and pedals</summary>
+  <developer id="io.github.fxdave">
+    <name>David Biró</name>
+  </developer>
+  <description>
+    <p>
+      Phone Controllers turns phones into a steering wheel, pedals, a gear lever and buttons
+      for games and driving simulators. Phones open a web page, with no app to install, and
+      the PC gets a joystick that games, Steam and Proton see like a real wheel.
+    </p>
+    <ul>
+      <li>Drag the wheel, or hold the phone like a wheel and steer with it</li>
+      <li>Analog clutch, brake and gas: slide a finger, tilt the phone, or cover its camera</li>
+      <li>A turn signal lever that cancels itself and a sequential gear lever</li>
+      <li>Force feedback: the game's steering force turns the wheel, rumble vibrates the phone</li>
+      <li>Several phones at once, for example one as the wheel and another as pedals</li>
+      <li>Pedal travel, response curves and rotation set on the PC and sent to phones live</li>
+      <li>Move, resize and remove every control on the phone</li>
+    </ul>
+    <p>
+      The phone needs a browser on the same network. The PC needs access to /dev/uinput.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.fxdave.PhoneControllers.desktop</launchable>
+  <url type="homepage">https://github.com/fxdave/PhoneControllers</url>
+  <url type="bugtracker">https://github.com/fxdave/PhoneControllers/issues</url>
+  <url type="vcs-browser">https://github.com/fxdave/PhoneControllers</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The live cockpit, connected phones and the game using the wheel</caption>
+      <image>https://raw.githubusercontent.com/fxdave/PhoneControllers/main/docs/screenshots/dark-home.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Steering rotation and how you steer</caption>
+      <image>https://raw.githubusercontent.com/fxdave/PhoneControllers/main/docs/screenshots/light-steering.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>How each pedal is pressed, its travel and its feel</caption>
+      <image>https://raw.githubusercontent.com/fxdave/PhoneControllers/main/docs/screenshots/light-pedal-b.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Signal lever, gear lever and button names</caption>
+      <image>https://raw.githubusercontent.com/fxdave/PhoneControllers/main/docs/screenshots/light-buttons.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The phone as wheel, levers, buttons and pedals</caption>
+      <image>https://raw.githubusercontent.com/fxdave/PhoneControllers/main/docs/screenshots/phone-landscape.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#f5c27a</color>
+    <color type="primary" scheme_preference="dark">#7a4a0e</color>
+  </branding>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-10-19">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

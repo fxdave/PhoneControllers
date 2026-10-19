@@ -6,88 +6,189 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#111418">
-  <title>Phone Wheel</title>
+  <title>Phone Controllers</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div id="rotate-hint">Rotate your phone to landscape</div>
-
   <main id="controller">
     <header id="topbar">
       <span id="status" class="status" data-state="connecting">connecting</span>
       <span id="angle-readout">0°</span>
+      <span id="game-readout" hidden></span>
       <span class="spacer"></span>
+      <button class="tool" id="level" type="button" hidden>Set tilt neutral</button>
       <button class="tool" id="recenter" type="button">Center</button>
       <button class="tool" id="open-settings" type="button">Settings</button>
       <button class="tool" id="fullscreen" type="button">Fullscreen</button>
     </header>
 
-    <section id="wheel-zone">
-      <button class="btn paddle" data-button="0" type="button">Shift −</button>
-      <div id="wheel">
-        <svg viewBox="-100 -100 200 200" aria-hidden="true">
-          <circle class="rim" r="88" />
-          <circle class="rim-inner" r="74" />
-          <path class="spoke" d="M -74 6 L -22 14 L 22 14 L 74 6 L 74 -6 L 22 -6 L -22 -6 L -74 -6 Z" />
-          <path class="spoke" d="M -10 20 L -8 74 L 8 74 L 10 20 Z" />
-          <circle class="hub" r="24" />
-          <rect class="marker" x="-4" y="-98" width="8" height="22" rx="3" />
-        </svg>
-      </div>
-      <button class="btn paddle" data-button="1" type="button">Shift +</button>
-    </section>
+    <header id="edit-bar">
+      <span class="edit-hint">Drag to move, the corner to resize, × to remove</span>
+      <span class="spacer"></span>
+      <button class="tool" id="edit-add" type="button" hidden>Add back</button>
+      <button class="tool" id="edit-auto" type="button">Automatic</button>
+      <button class="tool" id="edit-cancel" type="button">Cancel</button>
+      <button class="tool primary" id="edit-save" type="button">Save</button>
+    </header>
 
-    <section id="buttons">
-      <button class="btn" data-button="2" type="button">Handbrake</button>
-      <button class="btn" data-button="3" type="button">Horn</button>
-      <button class="btn" data-button="4" type="button">Lights</button>
-      <button class="btn" data-button="5" type="button">Camera</button>
-      <button class="btn" data-button="6" type="button">Look back</button>
-      <button class="btn" data-button="7" type="button">Wipers</button>
-      <button class="btn" data-button="8" type="button">Ignition</button>
-      <button class="btn" data-button="9" type="button">Hazard</button>
-      <button class="btn" data-button="10" type="button">Map</button>
-      <button class="btn" data-button="11" type="button">Pause</button>
-    </section>
+    <div id="edit-tray" hidden></div>
 
-    <section id="pedals">
-      <div class="pedal" data-pedal="c"><div class="fill"></div><span>Clutch</span></div>
-      <div class="pedal" data-pedal="b"><div class="fill"></div><span>Brake</span></div>
-      <div class="pedal" data-pedal="t"><div class="fill"></div><span>Gas</span></div>
-    </section>
+    <p id="no-controls" hidden>No controls on this phone. Turn some on in Settings.</p>
+
+    <div id="deck">
+      <section id="wheel-zone">
+        <button class="btn paddle" data-button="0" type="button">Shift −</button>
+        <div id="wheel">
+          <svg class="rotor" viewBox="-100 -100 200 200" aria-hidden="true">
+            <circle class="rim" r="88" />
+            <circle class="rim-inner" r="74" />
+            <path class="spoke" d="M -74 6 L -22 14 L 22 14 L 74 6 L 74 -6 L 22 -6 L -22 -6 L -74 -6 Z" />
+            <path class="spoke" d="M -10 20 L -8 74 L 8 74 L 10 20 Z" />
+            <circle class="hub" r="24" />
+            <rect class="marker" x="-4" y="-98" width="8" height="22" rx="3" />
+          </svg>
+          <!-- Force feedback from the game; stays put while the wheel turns. -->
+          <svg class="force" viewBox="-100 -100 200 200" aria-hidden="true">
+            <path id="force-arc" d="" />
+            <!-- Tap the hub to switch between touch and gyro steering. -->
+            <text id="hub-mode" x="0" y="4" text-anchor="middle">Touch</text>
+          </svg>
+        </div>
+        <button class="btn paddle" data-button="1" type="button">Shift +</button>
+        <!-- Turn signal stalk: up = right, down = left, middle = off. -->
+        <div id="lever" class="stalk" data-position="center" role="slider" aria-label="Turn signal lever">
+          <span class="lever-arrow up">▲</span>
+          <div class="lever-slot"><div class="lever-knob"></div></div>
+          <span class="lever-arrow down">▼</span>
+        </div>
+        <!-- Sequential shifter: springs back to the middle. -->
+        <div id="shifter" class="stalk" data-shift="none" role="slider" aria-label="Shift lever">
+          <span class="lever-arrow up">+</span>
+          <div class="lever-slot"><div class="lever-knob"></div></div>
+          <span class="lever-arrow down">−</span>
+        </div>
+      </section>
+
+      <section id="buttons">
+        <button class="btn" data-button="2" type="button">Handbrake</button>
+        <button class="btn" data-button="3" type="button">Horn</button>
+        <button class="btn" data-button="4" type="button">Lights</button>
+        <button class="btn" data-button="5" type="button">Camera</button>
+        <button class="btn" data-button="6" type="button">Look back</button>
+        <button class="btn" data-button="7" type="button">Wipers</button>
+        <button class="btn" data-button="8" type="button">Ignition</button>
+        <button class="btn" data-button="9" type="button">Hazard</button>
+        <button class="btn" data-button="10" type="button">Map</button>
+        <button class="btn" data-button="11" type="button">Pause</button>
+      </section>
+
+      <section id="pedals">
+        <div class="pedal" data-pedal="c"><div class="fill"></div><i class="out"></i><i class="game" hidden></i><em>tilt</em><span>Clutch</span></div>
+        <div class="pedal" data-pedal="b"><div class="fill"></div><i class="out"></i><i class="game" hidden></i><em>tilt</em><span>Brake</span></div>
+        <div class="pedal" data-pedal="t"><div class="fill"></div><i class="out"></i><i class="game" hidden></i><em>tilt</em><span>Gas</span></div>
+      </section>
+
+      <div id="layout-editor" hidden></div>
+    </div>
   </main>
 
   <dialog id="settings">
     <form method="dialog">
       <h2>Settings</h2>
-      <label>
-        Wheel rotation <output id="range-value">900°</output>
-        <input id="range" type="range" min="180" max="1440" step="90" value="900">
-      </label>
-      <label class="check">
-        <input id="autocenter" type="checkbox">
-        Spring back to center when released
-      </label>
-      <label class="check">
-        <input id="haptics" type="checkbox" checked>
-        Vibrate on button press
-      </label>
-      <div class="vibration-test">
-        <span>Test vibration:</span>
-        <button type="button" class="secondary" data-vibrate-ms="30">30 ms</button>
-        <button type="button" class="secondary" data-vibrate-ms="100">100 ms</button>
-        <button type="button" class="secondary" data-vibrate-ms="300">300 ms</button>
-        <button type="button" class="secondary" data-vibrate-ms="1000">1 s</button>
-        <button type="button" class="secondary" data-vibrate-ms="3000">3 s</button>
-      </div>
-      <div class="vibration-test">
-        <span id="vibration-result"></span>
+      <p class="hint">
+        Steering, pedal, curve, force feedback and button settings are on the PC, in the
+        Phone Controllers app. These are only for this phone.
+      </p>
+      <div class="settings-columns">
+        <fieldset>
+          <legend>Controls on this phone</legend>
+          <p class="hint">
+            Turn off what another phone handles. With several phones connected, steering and
+            each pedal follow whichever phone turns or presses furthest; buttons combine.
+          </p>
+          <div class="control-toggles">
+            <label class="check"><input type="checkbox" data-control="wheel"> Steering wheel</label>
+            <label class="check"><input type="checkbox" data-control="paddles"> Shift paddles</label>
+            <label class="check"><input type="checkbox" data-control="buttons"> Buttons</label>
+            <label class="check"><input type="checkbox" data-control="lever"> Signal lever</label>
+            <label class="check"><input type="checkbox" data-control="shifter"> Shift lever</label>
+            <label class="check"><input type="checkbox" data-control="c"> Clutch</label>
+            <label class="check"><input type="checkbox" data-control="b"> Brake</label>
+            <label class="check"><input type="checkbox" data-control="t"> Gas</label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Layout</legend>
+          <p class="hint">
+            Move and resize every control. Upright and sideways each keep their own layout.
+          </p>
+          <div class="row-buttons">
+            <button id="customize" type="button" class="secondary">Customize layout</button>
+            <button id="auto-layout" type="button" class="secondary" hidden>Back to automatic</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Vibration</legend>
+          <label class="check">
+            <input id="haptics" type="checkbox" checked>
+            Vibrate on button press and game rumble
+          </label>
+          <div class="vibration-test">
+            <span>Test:</span>
+            <button type="button" class="secondary" data-vibrate-ms="30">30 ms</button>
+            <button type="button" class="secondary" data-vibrate-ms="100">100 ms</button>
+            <button type="button" class="secondary" data-vibrate-ms="300">300 ms</button>
+            <button type="button" class="secondary" data-vibrate-ms="1000">1 s</button>
+            <button type="button" class="secondary" data-vibrate-ms="3000">3 s</button>
+          </div>
+          <div class="vibration-test">
+            <span id="vibration-result"></span>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tilt</legend>
+          <div class="vibration-test">
+            <button id="set-neutral" type="button" class="secondary">Set neutral</button>
+            <span id="tilt-status"></span>
+          </div>
+          <p id="programs" class="hint"></p>
+        </fieldset>
+
+        <fieldset id="camera-settings" hidden>
+          <legend>Camera pedal</legend>
+          <p class="hint">
+            Cover the back camera with a finger to press the pedal. To calibrate, tap each button
+            while holding the phone the way you drive. With several lenses, pick the one that
+            goes dark in the preview when you cover it.
+          </p>
+          <div class="camera-live">
+            <canvas id="camera-preview" width="32" height="24"></canvas>
+            <p id="camera-status" class="hint"></p>
+          </div>
+          <label id="camera-lens-row" class="inline" hidden>
+            Lens
+            <select id="camera-lens"></select>
+          </label>
+          <label>
+            Smoothing
+            <input id="camera-smoothing" type="range" min="0" max="100" step="5">
+          </label>
+          <div class="row-buttons">
+            <button id="camera-open" type="button" class="secondary">Uncovered now</button>
+            <button id="camera-covered" type="button" class="secondary">Covered now</button>
+            <button id="camera-auto" type="button" class="secondary">Automatic</button>
+          </div>
+        </fieldset>
       </div>
       <button type="submit">Done</button>
     </form>
   </dialog>
 
+  <script src="/static/curves.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

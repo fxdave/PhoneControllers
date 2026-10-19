@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Phone Controllers
+Comment=Use your phone as a steering wheel, pedals and buttons
+Exec=phone-controllers
+Icon=io.github.fxdave.PhoneControllers
+Terminal=false
+Categories=Game;
+Keywords=wheel;steering;pedals;clutch;joystick;controller;gamepad;driving;simulator;phone;
+StartupNotify=true

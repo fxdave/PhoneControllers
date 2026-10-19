@@ -36,22 +36,60 @@ button {
   color: inherit;
 }
 
+/* Several rules below set display, which would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }
+
 #controller {
+  position: relative;
   height: 100dvh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.95fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas:
-    "top top top"
-    "wheel buttons pedals";
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
            max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
 }
 
-#topbar {
-  grid-area: top;
+/* Each phone shows only the controls it handles; the rest share the width by these weights. */
+#deck {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   display: flex;
+  gap: 8px;
+}
+#deck > * { min-width: 0; flex-basis: 0; }
+#wheel-zone { flex-grow: 5; }
+#buttons { flex-grow: 4; }
+#pedals { flex-grow: calc(1.25 * var(--pedal-count, 3)); }
+
+/* Upright phone: controls stack top to bottom, pedals at the bottom. */
+@media (orientation: portrait) {
+  #deck { flex-direction: column; }
+  #deck > * { min-width: auto; min-height: 0; }
+}
+
+/* Full gyro: the wheel is only an indicator, so the clutch moves under the left thumb. */
+@media (orientation: landscape) {
+  #controller.gyro #pedals { display: contents; }
+  #controller.gyro .pedal { flex: 1.8 1 0; min-width: 0; }
+  #controller.gyro .pedal[data-pedal="c"] { order: -1; flex-grow: 2; }
+  #controller.gyro #wheel-zone { flex-grow: 4; }
+}
+#controller.gyro #wheel { opacity: 0.8; }
+
+#no-controls {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+#topbar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -77,6 +115,12 @@ button {
 .status[data-state="online"]::before { background: var(--gas); }
 .status[data-state="offline"]::before { background: var(--brake); }
 
+#game-readout {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
 #angle-readout {
   min-width: 5ch;
   font-variant-numeric: tabular-nums;
@@ -93,7 +137,6 @@ button {
 
 /* Wheel */
 #wheel-zone {
-  grid-area: wheel;
   position: relative;
   display: flex;
   align-items: center;
@@ -102,6 +145,7 @@ button {
 }
 
 #wheel {
+  position: relative;
   height: 100%;
   max-width: 100%;
   aspect-ratio: 1;
@@ -111,8 +155,17 @@ button {
   width: 100%;
   height: 100%;
   display: block;
-  will-change: transform;
 }
+#wheel svg.rotor { will-change: transform; }
+#wheel svg.force { position: absolute; inset: 0; pointer-events: none; }
+#hub-mode {
+  font: 600 11px system-ui, sans-serif;
+  fill: var(--muted);
+  pointer-events: none;
+}
+#controller.gyro #hub-mode { fill: var(--accent); }
+#wheel.hub-pressed .hub { fill: #3a4350; }
+#force-arc { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; opacity: 0.9; }
 #wheel .rim { fill: none; stroke: #3a4350; stroke-width: 16; }
 #wheel .rim-inner { fill: none; stroke: #262d36; stroke-width: 2; }
 #wheel .spoke, #wheel .hub { fill: #2a313b; stroke: #3a4350; stroke-width: 1.5; }
@@ -128,16 +181,75 @@ button {
 }
 .paddle[data-button="0"] { left: 0; }
 .paddle[data-button="1"] { right: 0; }
+/* Stalks: the turn signal lever bottom left of the wheel area, the shifter bottom right. */
+.stalk {
+  position: absolute;
+  bottom: 0;
+  z-index: 1;
+  width: 52px;
+  height: 46%;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  touch-action: none;
+}
+.lever-arrow { font-size: 14px; color: var(--muted); line-height: 1; }
+.lever-slot {
+  position: relative;
+  flex: 1;
+  width: 10px;
+  border-radius: 5px;
+  background: var(--bg);
+}
+.lever-knob {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - var(--offset, 0) * 38%);
+  width: 36px;
+  height: 22px;
+  border-radius: 8px;
+  background: #3a4350;
+  border: 1px solid #4a5566;
+  transform: translate(-50%, -50%);
+  transition: top 0.12s ease-out;
+}
+#lever { left: 0; }
+#shifter { right: 0; }
+.stalk.held .lever-knob { transition: none; background: #4a5566; }
+#shifter .lever-arrow { font-size: 18px; font-weight: 700; }
+#shifter[data-shift="up"] .lever-arrow.up,
+#shifter[data-shift="down"] .lever-arrow.down { color: var(--accent); }
+#lever[data-position="right"] .lever-arrow.up,
+#lever[data-position="left"] .lever-arrow.down {
+  color: var(--gas);
+  animation: blink 0.8s steps(2, jump-none) infinite;
+}
+#lever:not([data-position="center"]) .lever-knob { border-color: var(--gas); }
+@keyframes blink { 50% { color: var(--muted); } }
+
+#wheel-zone.has-stalks #wheel { max-width: max(calc(100% - 116px), 55%); }
+
+/* Paddles without the wheel: two big shift buttons side by side. */
+#wheel-zone.no-wheel { flex-grow: 3; align-items: stretch; gap: 8px; }
+#wheel-zone.no-wheel .paddle { position: static; flex: 1; width: auto; height: auto; }
+#wheel-zone.no-wheel .stalk { position: static; flex: 0 0 52px; height: auto; }
 
 /* Buttons */
 #buttons {
-  grid-area: buttons;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: minmax(0, 1fr);
   gap: 6px;
   min-height: 0;
 }
+/* Without the wheel the buttons get most of the width: use it for more columns. */
+#controller.wide-buttons #buttons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .btn {
   border: 1px solid var(--line);
@@ -154,9 +266,9 @@ button {
 
 /* Pedals */
 #pedals {
-  grid-area: pedals;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
 }
@@ -178,6 +290,30 @@ button {
 .pedal[data-pedal="c"] .fill { background: var(--clutch); }
 .pedal[data-pedal="b"] .fill { background: var(--brake); }
 .pedal[data-pedal="t"] .fill { background: var(--gas); }
+/* What the PC sends the game (after the output curve), and what the game reports back. */
+.pedal .out, .pedal .game {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid rgb(255 255 255 / 0.75);
+  pointer-events: none;
+}
+.pedal .game { border-top: 2px dashed var(--accent); }
+.pedal em {
+  display: none;
+  position: absolute;
+  inset: 8px 0 auto 0;
+  text-align: center;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+.pedal.tilt em { display: block; }
+.pedal.tilt { border-style: dashed; }
 .pedal span {
   position: absolute;
   inset: auto 0 10px 0;
@@ -192,9 +328,68 @@ dialog {
   border-radius: var(--radius);
   background: var(--panel);
   color: var(--text);
-  width: min(420px, calc(100vw - 32px));
-  touch-action: auto;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  touch-action: pan-y;
 }
+dialog .settings-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+dialog fieldset {
+  margin: 0 0 12px;
+  padding: 8px 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+}
+dialog legend { padding: 0 6px; color: var(--muted); }
+dialog .pedal-modes {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+dialog .pedal-modes label { margin: 0; }
+dialog .control-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+dialog select {
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+dialog #tilt-status { color: var(--muted); font-size: 12px; }
+dialog label.inline { display: flex; gap: 10px; align-items: center; }
+dialog label.inline select { flex: 1; }
+dialog .mode-options { margin: -6px 0 14px 16px; }
+dialog .mode-options[hidden] { display: none; }
+dialog .hint { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+dialog .note { margin: 0 0 14px; color: var(--accent); font-size: 12px; }
+dialog #tilt-status a { color: var(--accent); word-break: break-all; }
+dialog .row-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+dialog .row-buttons button { width: auto; flex: 1; }
+dialog #programs { margin-top: -4px; }
+dialog .camera-live { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+dialog .camera-live .hint { margin: 0; }
+dialog #camera-preview {
+  flex: none;
+  width: 64px;
+  height: 48px;
+  border-radius: 6px;
+  background: #000;
+  image-rendering: pixelated;
+}
+dialog label[hidden] { display: none; }
 dialog .vibration-test {
   display: flex;
   flex-wrap: wrap;
@@ -224,18 +419,87 @@ dialog button {
   font-weight: 600;
 }
 
-#rotate-hint {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: var(--bg);
-  font-size: 18px;
-  text-align: center;
+/* Customized layout: every widget sits where the phone's layout puts it, in percent of the
+   control area. The groups step aside so their children are placed directly. */
+#deck.custom { display: block; }
+#deck.custom #wheel-zone, #deck.custom #buttons, #deck.custom #pedals { display: contents; }
+#deck.custom #wheel, #deck.custom .stalk, #deck.custom .btn, #deck.custom .pedal {
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  max-width: none;
+  margin: 0;
 }
-@media (orientation: portrait) {
-  #rotate-hint { display: flex; }
+#deck.custom #wheel { aspect-ratio: auto; }
+#deck.custom .stalk { min-height: 0; }
+
+/* Layout editor */
+#edit-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; }
+#controller.editing #edit-bar { display: flex; }
+#controller.editing #topbar { display: none; }
+.edit-hint { color: var(--muted); font-size: 12px; }
+.tool.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+#layout-editor { position: absolute; inset: 0; z-index: 5; touch-action: none; }
+.edit-box {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: rgb(242 165 65 / 0.08);
+  touch-action: none;
+}
+.edit-box.active { background: rgb(242 165 65 / 0.2); z-index: 1; }
+.edit-box span {
+  position: absolute;
+  inset: auto auto 4px 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--accent);
+  pointer-events: none;
+}
+.edit-box.front { z-index: 2; }
+/* Sits on the top edge, half outside, so it doesn't cover the control's own name. */
+.edit-delete {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--brake);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+/* Floats over the controls, so opening it doesn't squash the layout being edited. */
+#edit-tray {
+  position: absolute;
+  top: max(52px, calc(env(safe-area-inset-top) + 44px));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 70%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+}
+#edit-tray[hidden] { display: none; }
+.edit-handle {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 0 0 var(--radius) 0;
+  background: var(--accent);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
