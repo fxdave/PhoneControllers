@@ -100,8 +100,8 @@ feedback (constant, spring, damper, periodic, rumble).
 
 ## Contributing
 
-This project is vibecoded: written with an AI assistant, so expect bugs. Bug reports and pull
-requests are welcome.
+Note: The project is vibecoded without the need for perfection, as phones are not perfect
+controllers either. Bug reports and pull requests are welcome.
 
 Run the tests with `.venv/bin/pip install pytest && .venv/bin/python -m pytest`. Releases are
 described in [RELEASING.md](RELEASING.md).
