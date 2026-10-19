@@ -2,8 +2,8 @@
 
 **Your phone is the steering wheel. Another one is the pedals.**
 
-Open a web page on your phone and your Linux PC gets a real wheel that every game sees. No app
-on the phone, no driver on the PC.
+Open a web page on your phone and your Linux PC gets a virtual joystick, the same kind of
+device a plugged-in wheel is. No app on the phone, no driver on the PC.
 
 <p align="center">
   <img src="docs/screenshots/phone-landscape.png" width="80%" alt="The phone as a steering wheel with signal and shift levers, buttons and pedals">
@@ -13,16 +13,16 @@ on the phone, no driver on the PC.
 
 - **Scan, drive.** Scan a QR code and the phone becomes a wheel, pedals, gear lever and turn
   signals.
-- **Feel the road.** The game's force feedback turns the wheel on screen, and bumps vibrate
-  the phone.
+- **Feel the road.** When a game sends force feedback, it turns the wheel on screen, and
+  rumble vibrates the phone.
 - **Use every phone in the house.** One as the wheel, one on the floor as pedals.
 - **Steer your way.** Drag the wheel with your thumb, or hold the phone and turn it like a
   real wheel.
-- **Look around.** Turn the phone to the side and the camera looks out the side window.
+- **Look around.** Turn the phone to the side and the camera looks out the side window
+  (Rigs of Rods for now).
 - **Press pedals any way.** Slide a finger, tilt the phone, or cover its back camera.
 - **Practise real driving.** A clutch with a bite point, indicators that cancel after the
-  turn, and a gear lever. Set up for Rigs of Rods out of the box; any game that takes a wheel
-  works.
+  turn, and a gear lever.
 
 <p align="center">
   <img src="docs/screenshots/dark-home.png" width="62%" alt="The desktop app: a live cockpit with the wheel, levers and pedals, the connected phones and the game using the wheel">
@@ -31,6 +31,12 @@ on the phone, no driver on the PC.
 
 Everything is set up on the PC, in an app that shows what the game gets, live. You never
 have to configure a pedal while it's in your hand.
+
+## Which games
+
+So far it has only been tried with **Rigs of Rods**, which the app sets up in one click.
+Other games that accept a joystick or wheel should be able to use it, but none has been
+tested yet. If you try one, an issue saying whether it worked is very welcome.
 
 > **Honest note:** this is vibecoded, built quickly with an AI assistant, and doesn't chase
 > perfection. A phone isn't the perfect tool for the job either. It's meant to be good enough

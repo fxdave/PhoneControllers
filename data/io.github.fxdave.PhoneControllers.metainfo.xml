@@ -12,7 +12,8 @@
     <p>
       Phone Controllers turns phones into a steering wheel, pedals, a gear lever and buttons
       for games and driving simulators. Phones open a web page, with no app to install, and
-      the PC gets a joystick that games, Steam and Proton see like a real wheel.
+      the PC gets a virtual joystick. So far it has been tested with Rigs of Rods, which it
+      sets up in one click.
     </p>
     <ul>
       <li>Drag the wheel, or hold the phone like a wheel and steer with it</li>
