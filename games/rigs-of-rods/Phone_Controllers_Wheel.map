@@ -1,11 +1,13 @@
 ; Rigs of Rods input map for the "Phone Controllers Wheel" virtual joystick (this repo's server.py).
 ; Install: copy to ~/.rigsofrods/config/Phone_Controllers_Wheel.map and restart the game.
 ;
-; OIS axes: 0 steering, 1 gas, 2 brake, 3 clutch. Pedals run -1 (released) .. +1 (pressed),
-; which Rigs of Rods maps to 0..1 when no LOWER/UPPER region is given.
+; OIS axes: 0 steering, 1 gas, 2 brake, 3 clutch, 4 look around. Pedals run -1 (released)
+; .. +1 (pressed), which Rigs of Rods maps to 0..1 when no LOWER/UPPER region is given. The
+; look axis is how fast the camera turns; the PC steers it toward where the phone points.
 ; Buttons follow the phone layout: 0 Shift-, 1 Shift+, 2 Handbrake, 3 Horn, 4 Lights,
 ; 5 Camera, 6 Look back, 7 Wipers (ignition switch here), 8 Ignition (starter), 9 Hazard,
-; 10 Map, 11 Pause, 12 Left signal, 13 Right signal.
+; 10 Map, 11 Pause, 12 Left signal, 13 Right signal, 14 camera reset (pressed by the PC
+; when the look direction is recentered).
 
 ; TRUCK
 TRUCK_STEER_LEFT               JoystickAxis         0 0 LOWER+DEADZONE=0.00
@@ -34,5 +36,8 @@ BOAT_THROTTLE_AXIS             JoystickAxis         0 1 DEADZONE=0.00
 COMMON_TOGGLE_TRUCK_LOW_BEAMS  JoystickButton       0 4
 CAMERA_CHANGE                  JoystickButton       0 5
 CAMERA_LOOKBACK                JoystickButton       0 6
+CAMERA_ROTATE_LEFT             JoystickAxis         0 4 LOWER+DEADZONE=0.00
+CAMERA_ROTATE_RIGHT            JoystickAxis         0 4 UPPER+DEADZONE=0.00
+CAMERA_RESET                   JoystickButton       0 14
 SURVEY_MAP_TOGGLE              JoystickButton       0 10
 COMMON_QUIT_GAME               JoystickButton       0 11

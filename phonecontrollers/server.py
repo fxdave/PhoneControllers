@@ -4,6 +4,7 @@ command line alike; everything runs on one asyncio loop."""
 import asyncio
 import contextlib
 import hashlib
+import itertools
 import json
 import os
 import shutil
@@ -18,7 +19,10 @@ from aiohttp import WSMsgType, web
 from evdev import UInputError
 
 from . import config as settings
-from .device import AXES, ForceFeedback, Wheel, create_device, parse_state
+from .device import (
+    AXES, LOOK_RESET_BIT, ForceFeedback, LookAround, Wheel, create_device, look_target,
+    parse_state,
+)
 from .outgauge import OutGaugeProtocol
 from .watch import OpenWatcher, device_nodes, programs_using
 
@@ -33,11 +37,16 @@ WATCH_INTERVAL = 1.0
 # Force feedback and the live monitor are sent at most this often, in seconds.
 FORCE_INTERVAL = 1 / 30
 MONITOR_INTERVAL = 1 / 20
+# The look-around camera is steered this often, in seconds.
+LOOK_INTERVAL = 1 / 60
+# How long the game's camera reset button is held when the look direction is recentered.
+LOOK_RESET_PRESS = 0.15
 # After a game opens the device, resync the axes after these delays: the game may still be
 # setting up when it opens it, and some open, close and reopen while probing.
 RESYNC_DELAYS = (0.3, 1.5)
 
-FIELD_NAMES = {"s": "steering", "t": "gas", "b": "brake", "c": "clutch", "k": "buttons"}
+FIELD_NAMES = {"s": "steering", "t": "gas", "b": "brake", "c": "clutch", "k": "buttons",
+               "l": "look around"}
 
 
 def data_dir() -> Path:
@@ -123,19 +132,24 @@ class Phone:
     ws: web.WebSocketResponse
     address: str
     connected: float = field(default_factory=time.time)
+    key: int = 0
     id: str = ""
     name: str = ""
     controls: list = field(default_factory=list)
+    # Buttons (by number) this phone shows.
+    buttons: list = field(default_factory=list)
     state: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
     rtt: float | None = None
 
     def describe(self) -> dict:
         return {
+            "key": self.key,
             "id": self.id,
             "name": self.name or self.address,
             "address": self.address,
             "controls": self.controls,
+            "buttons": self.buttons,
             "sends": [FIELD_NAMES[key] for key in self.state],
             "rtt": self.rtt,
             "connected": self.connected,
@@ -160,6 +174,8 @@ class Server:
         self.status: dict = {"running": False}
         self._resync_handles: list[asyncio.TimerHandle] = []
         self._last_forces: dict | None = None
+        self._phone_keys = itertools.count(1)
+        self.look = LookAround()
         self._programs_task: asyncio.Future | None = None
         self._programs_dirty = False
 
@@ -286,6 +302,7 @@ class Server:
                 "shown": dict(self.wheel.merged),
                 "output": {key: round(self.wheel.output(key), 4) for key in AXES},
                 "buttons": self.wheel.buttons,
+                "look": round(self.look.angle) if self.config["look"]["enabled"] else None,
                 "ff": self._last_forces or self.forces(),
             }
             if monitor != last:
@@ -308,7 +325,7 @@ class Server:
     async def websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(heartbeat=2.0)
         await ws.prepare(request)
-        phone = Phone(ws=ws, address=request.remote or "?")
+        phone = Phone(ws=ws, address=request.remote or "?", key=next(self._phone_keys))
         phone.name = describe_browser(request.headers.get("User-Agent", ""))
         self.phones[ws] = phone
         self.log(f"phone connected: {phone.address}")
@@ -332,6 +349,9 @@ class Server:
                         continue
                     if "set" in data:
                         self.phone_setting(phone, data["set"])
+                        continue
+                    if "lookCenter" in data:
+                        self.look_center()
                         continue
                     state = parse_state(data)
                     raw = data.get("r")
@@ -378,6 +398,10 @@ class Server:
             controls = hello.get("controls")
             if isinstance(controls, list):
                 phone.controls = [str(control) for control in controls][:16]
+            buttons = hello.get("buttons")
+            if isinstance(buttons, list):
+                phone.buttons = sorted({b for b in buttons if isinstance(b, int)
+                                        and not isinstance(b, bool) and 0 <= b < 32})
             self.emit_phones()
         if "ping" in data:
             await phone.ws.send_json({"pong": data["ping"]})
@@ -385,6 +409,45 @@ class Server:
             if isinstance(rtt, (int, float)) and rtt != phone.rtt:
                 phone.rtt = round(float(rtt))
                 self.emit_phones()
+
+    def show_on_phone(self, key: int, widget: str, shown: bool) -> None:
+        """Shows or hides one control on one phone, chosen from the desktop app."""
+        for phone in self.phones.values():
+            if phone.key == key:
+                asyncio.ensure_future(
+                    phone.ws.send_json({"show": {"widget": widget, "shown": bool(shown)}}))
+
+    # ---------- looking around ----------
+
+    async def drive_look(self) -> None:
+        """Turns the game's camera toward where the steering phone points."""
+        last = time.monotonic()
+        while True:
+            await asyncio.sleep(LOOK_INTERVAL)
+            now = time.monotonic()
+            options = self.config["look"]
+            yaw = self.wheel.look_target()
+            target = look_target(yaw, options) if options["enabled"] and yaw is not None else 0.0
+            self.wheel.set_look(self.look.step(target, now - last))
+            last = now
+
+    def look_center(self) -> None:
+        """The phone's straight-ahead was set again: put the game's camera back too."""
+        self.look.reset()
+        # Until the phone's next state arrives, its last look angle is from before the reset.
+        for state in self.wheel.phones.values():
+            state.pop("l", None)
+        self.wheel.set_look(0.0)
+        if not self.config["look"]["enabled"]:
+            return
+        self.wheel.own_buttons |= LOOK_RESET_BIT
+        self.wheel.emit()
+
+        def release() -> None:
+            self.wheel.own_buttons &= ~LOOK_RESET_BIT
+            self.wheel.emit()
+
+        asyncio.get_running_loop().call_later(LOOK_RESET_PRESS, release)
 
     # ---------- running ----------
 
@@ -479,7 +542,7 @@ class Server:
 
             tasks = [asyncio.create_task(coroutine) for coroutine in (
                 self.watch_page(), self.read_force_feedback(device), self.send_forces(),
-                self.send_monitor())]
+                self.send_monitor(), self.drive_look())]
 
             http_url = f"http://{address}:{options['port']}/"
             https_url = f"https://{address}:{https_port}/" if ssl_context else None

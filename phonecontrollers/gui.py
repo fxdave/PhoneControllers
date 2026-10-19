@@ -456,9 +456,48 @@ class Window(Adw.ApplicationWindow):
                 chip.add_css_class("chip")
                 chips.append(chip)
             row.add_suffix(chips)
+            edit = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER,
+                              tooltip_text="Choose what this phone shows")
+            edit.add_css_class("flat")
+            edit.connect("clicked", lambda _b, p=phone: self.edit_phone(p))
+            row.add_suffix(edit)
             self.phone_list.append(row)
         self.connect_box.set_visible(not phones)
         self.add_phone.set_visible(bool(phones))
+
+    def edit_phone(self, phone: dict) -> None:
+        """Pick the controls and buttons one phone shows, without picking the phone up."""
+        key = phone["key"]
+
+        def toggle(widget: str, active: bool) -> None:
+            self.app.runner.call(lambda server: server.show_on_phone(key, widget, active))
+
+        def row(widget: str, title: str, active: bool) -> Adw.SwitchRow:
+            switch = Adw.SwitchRow(title=title, active=active)
+            switch.connect("notify::active", lambda r, _p: toggle(widget, r.get_active()))
+            return switch
+
+        controls = Adw.PreferencesGroup(
+            title="Controls",
+            description="Turn off what another phone handles. Steering and each pedal "
+                        "follow whichever phone turns or presses furthest.")
+        for widget, control, title in (
+                ("wheel", "wheel", "Steering wheel"), ("lever", "lever", "Signal lever"),
+                ("shifter", "shifter", "Shift lever"), ("pedal-c", "c", "Clutch"),
+                ("pedal-b", "b", "Brake"), ("pedal-t", "t", "Gas")):
+            controls.add(row(widget, title, control in phone["controls"]))
+        buttons = Adw.PreferencesGroup(title="Buttons")
+        labels = self.config["buttons"]
+        for index in range(12):
+            buttons.add(row(f"button-{index}", labels[index], index in phone["buttons"]))
+        page = Adw.PreferencesPage()
+        page.add(controls)
+        page.add(buttons)
+        view = Adw.ToolbarView(content=page)
+        view.add_top_bar(Adw.HeaderBar())
+        dialog = Adw.Dialog(title=f"{phone['name']}, {phone['address']}", child=view,
+                            content_width=460, content_height=640)
+        dialog.present(self)
 
     def show_programs(self, programs: list) -> None:
         self.programs = programs
@@ -541,6 +580,12 @@ class Window(Adw.ApplicationWindow):
             editor.set_live(raw.get(key) if kind == "pre" else shown[key])
         forces = monitor["ff"]
         self.force_gauge.update(forces["force"], forces["rumble"])
+        angle = monitor.get("look")
+        if angle is not None:
+            side = "right" if angle > 0 else "left"
+            text = f"{abs(angle)}° to the {side}" if angle else "Straight ahead"
+            if self.look_row.get_subtitle() != text:
+                self.look_row.set_subtitle(text)
 
     def show_game(self, packet: dict) -> None:
         first = self.game is None
@@ -631,6 +676,26 @@ class Window(Adw.ApplicationWindow):
             tilt_rows.set_visible(mode == "tilt-speed")
 
         self.bind(show_mode_rows)
+
+        look = Adw.PreferencesGroup(
+            title="Look around",
+            description="Turn the phone you steer with left or right and the game's camera "
+                        "turns with it, using the phone's compass. Center on the phone sets "
+                        "straight ahead. Rigs of Rods needs the updated wheel mapping from the "
+                        "home screen.")
+        look.add(self.switch(("look", "enabled"), "Look by turning the phone"))
+        self.look_row = Adw.ActionRow(title="Camera now", subtitle="Straight ahead")
+        look.add(self.look_row)
+        self.bind(lambda: self.look_row.set_visible(self.config["look"]["enabled"]))
+        look_rows = Adw.PreferencesGroup(title="Look around")
+        look_rows.add(self.spin(("look", "gain"), "Camera turn per phone degree",
+                                "At 3, turning the phone 30° looks 90° to the side",
+                                0.5, 8, 0.5, digits=1))
+        look_rows.add(self.spin(("look", "deadzone"), "Ignore the first",
+                                "Degrees of phone turn, so small wobbles don't move the view",
+                                0, 45, 1))
+        look_rows.add(self.switch(("look", "invert"), "Turn the camera the other way"))
+
         editors = Gtk.Box(spacing=18, homogeneous=True)
         editors.append(self.curve_editor("pre", "s", "Tilt to wheel", "phone tilt",
                                          "wheel angle"))
@@ -641,7 +706,8 @@ class Window(Adw.ApplicationWindow):
             rotation,
             section(heading("How you steer"), modes),
             spring,
-            fine_tuning(gyro_rows, tilt_rows,
+            look,
+            fine_tuning(gyro_rows, tilt_rows, look_rows,
                         caption("Curves shape both sides of center alike. The first one only "
                                 "bends tilt steering: a dragged wheel is its own input."),
                         editors))

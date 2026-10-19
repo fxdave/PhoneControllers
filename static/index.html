@@ -15,6 +15,7 @@
     <header id="topbar">
       <span id="status" class="status" data-state="connecting">connecting</span>
       <span id="angle-readout">0°</span>
+      <span id="look-readout" hidden></span>
       <span id="game-readout" hidden></span>
       <span class="spacer"></span>
       <button class="tool" id="level" type="button" hidden>Set tilt neutral</button>
@@ -117,6 +118,15 @@
             <label class="check"><input type="checkbox" data-control="b"> Brake</label>
             <label class="check"><input type="checkbox" data-control="t"> Gas</label>
           </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Buttons on this phone</legend>
+          <p class="hint">
+            Pick the buttons this phone shows; another phone can show the rest. The PC's app
+            can choose them too, from its list of phones.
+          </p>
+          <div id="button-toggles" class="control-toggles"></div>
         </fieldset>
 
         <fieldset>

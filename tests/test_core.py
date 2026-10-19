@@ -9,7 +9,9 @@ import pytest
 from evdev import ecodes
 
 from phonecontrollers import config, curves, outgauge
-from phonecontrollers.device import PEDAL_MAX, ForceFeedback, Wheel, parse_state
+from phonecontrollers.device import (
+    LOOK_AXIS, PEDAL_MAX, ForceFeedback, LookAround, Wheel, look_target, parse_state,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -167,14 +169,41 @@ def test_resync_nudges_every_axis_and_restores_it():
     wheel.update("a", parse_state({"t": 1}))
     device.events.clear()
     wheel.resync()
-    nudged = {code: value for etype, code, value in device.events[:4]}
+    nudged = {code: value for etype, code, value in device.events[:5]}
     assert nudged[ecodes.ABS_Z] == 1          # brake at 0 goes up a step
     assert nudged[ecodes.ABS_Y] == PEDAL_MAX - 1  # gas at full goes down a step
     assert nudged[ecodes.ABS_X] == 1
-    assert device.events[4] == "syn"
-    restored = {code: value for etype, code, value in device.events[5:9]}
-    assert restored == {ecodes.ABS_X: 0, ecodes.ABS_Y: PEDAL_MAX, ecodes.ABS_Z: 0, ecodes.ABS_RZ: 0}
+    assert nudged[LOOK_AXIS] == 1
+    assert device.events[5] == "syn"
+    restored = {code: value for etype, code, value in device.events[6:11]}
+    assert restored == {ecodes.ABS_X: 0, ecodes.ABS_Y: PEDAL_MAX, ecodes.ABS_Z: 0,
+                        ecodes.ABS_RZ: 0, LOOK_AXIS: 0}
     assert device.events[-1] == "syn"
+
+
+def test_look_follows_the_phone_and_settles():
+    look = LookAround()
+    rates = [look.step(90.0, 1 / 60) for _ in range(240)]
+    assert rates[0] == 1.0                    # far off: full speed
+    assert look.angle == pytest.approx(90.0, abs=0.5)
+    assert rates[-1] == 0.0                   # arrived: the camera holds still
+    look.reset()
+    assert look.step(0.0, 1 / 60) == 0.0
+
+
+def test_look_target_dead_zone_gain_and_invert():
+    options = {"gain": 3.0, "deadzone": 5, "invert": False}
+    assert look_target(4.0, options) == 0.0
+    assert look_target(15.0, options) == pytest.approx(30.0)
+    assert look_target(-15.0, options) == pytest.approx(-30.0)
+    assert look_target(200.0, options) == 170.0
+    assert look_target(15.0, {**options, "invert": True}) == pytest.approx(-30.0)
+
+
+def test_parse_state_reads_look():
+    assert parse_state({"l": 400})["l"] == 180.0
+    with pytest.raises(ValueError):
+        parse_state({"l": float("inf")})
 
 
 def test_parse_state_rejects_nan():

@@ -29,7 +29,10 @@ itself after the turn, and a sequential gear lever.
   set in the desktop app and pushed to the phones live.
 - **No stuck pedals.** When a game opens the wheel, every axis is sent again, so a brake the
   game assumed half-pressed is released.
-- **Your layout.** Move, resize and remove every control on the phone.
+- **Look around.** Turn the phone you steer with to the side and the game's camera turns
+  with it, using the phone's compass.
+- **Your layout.** Move, resize and remove every control on the phone, and pick which
+  buttons each phone shows.
 
 ## Install
 
@@ -96,8 +99,21 @@ If the phone can't reach the page, check that a firewall allows TCP ports 8765 a
   car it cancels itself when the wheel comes back after the turn.
 - **Shift lever**: a sequential shifter that springs back to the middle. Push up to shift up,
   or pull down (rally style).
-- **Paddles and 10 buttons**: handbrake, horn, lights, camera, look back, wipers, ignition,
-  hazards, map and pause by default. Rename them in the app and bind them to anything.
+- **10 buttons**: handbrake, horn, lights, camera, look back, wipers, ignition, hazards, map
+  and pause by default. Rename them in the app and bind them to anything. Shift paddles are
+  there too, hidden by default because the shift lever does the same.
+
+### Look around
+
+Turn on **Look around** on the app's Steering page. Then turn the phone you steer with left
+or right, like turning your head, and the game's camera follows: at the default setting,
+turning the phone 30° looks 90° to the side. Rolling the phone to steer doesn't move the
+view; the compass only follows where the back of the phone faces. **Center** on the phone
+(or **Set tilt neutral** when the phone is the wheel) makes the current direction straight
+ahead and puts the game's camera back.
+
+It needs the phone's compass, so the secure (https) address. In Rigs of Rods the camera
+turns at its own speed, so a quick look takes a moment to catch up.
 
 ### Camera pedal
 
@@ -106,6 +122,12 @@ shows what the camera sees and how far the pedal is pressed. Tap **Uncovered now
 **Covered now** while holding the phone the way you drive. Phones with several back cameras
 let you pick the lens your finger covers, and **Smoothing** trades a steadier pedal for a
 little delay.
+
+### Pick what each phone shows
+
+On the phone, **Settings** has a checkbox for every control and every button. In the
+desktop app, the pencil next to a phone in the list does the same from the PC, so you can
+set up a phone that's already mounted or lying on the floor.
 
 ### Customize the phone's layout
 
@@ -131,7 +153,7 @@ numbers and the curve editors sit folded under **Fine-tuning**.
 | | |
 |---|---|
 | <img src="docs/screenshots/light-steering.png" alt="Steering: rotation dial with vehicle presets and three ways to steer"> | <img src="docs/screenshots/light-pedal-b.png" alt="Brake: how you press it, travel markers and feel curves"> |
-| **Steering**: rotation (kart, sports car, road car and truck presets), how you steer, spring back to center. | **Pedals**: touch, tilt or camera; travel (drag the markers beside the pedal); feel. |
+| **Steering**: rotation (kart, sports car, road car and truck presets), how you steer, spring back to center, look around. | **Pedals**: touch, tilt or camera; travel (drag the markers beside the pedal); feel. |
 | <img src="docs/screenshots/dark-feedback.png" alt="Force feedback: strength and live force from the game"> | <img src="docs/screenshots/light-buttons.png" alt="Buttons and levers: signal lever and shift lever modes, button names"> |
 | **Force feedback**: the live force from the game, strength, direction, vibration on rumble. | **Buttons & levers**: how the signal lever presses, which way the gear lever shifts, button names. |
 
@@ -170,7 +192,8 @@ cp games/rigs-of-rods/Phone_Controllers_Wheel.map ~/.rigsofrods/config/
 ```
 
 Restart the game. Steering, pedals, shifting, handbrake, horn, lights, camera, look back,
-hazards, turn signals, map and menu are mapped. "Ignition" is the starter (hold it) and
+look around, hazards, turn signals, map and menu are mapped. After an update the home screen
+shows when the installed mapping is out of date. "Ignition" is the starter (hold it) and
 "Wipers" toggles the ignition switch.
 
 Force feedback is off in Rigs of Rods until its gains are set. **Turn on** in the app does it
@@ -189,6 +212,8 @@ Bind the axes and buttons in the game's controller settings. The device is calle
 | Clutch   | `ABS_RZ`  | 0 … 1023        |
 | Buttons 1–12 | `BTN_TRIGGER` … `BTN_BASE6` | |
 | Signal lever (13 left, 14 right) | `BTN_TRIGGER_HAPPY1`, `BTN_TRIGGER_HAPPY2` | |
+| Look around: camera turn speed | `ABS_RUDDER` | -32767 … 32767 |
+| Camera reset when looking is recentered (15) | `BTN_TRIGGER_HAPPY3` | |
 
 Test it with `jstest-gtk`, `evtest`, `fftest`, or Steam's controller settings.
 

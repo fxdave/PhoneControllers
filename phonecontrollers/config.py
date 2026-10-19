@@ -74,6 +74,12 @@ DEFAULTS = {
     "shifter": {
         "upShifts": True,          # pushing the shift lever up shifts up (False: rally style)
     },
+    "look": {
+        "enabled": False,          # turning the steering phone left or right looks around
+        "gain": 3.0,               # degrees the camera turns per degree the phone turns
+        "deadzone": 5,             # degrees of phone turn ignored around center
+        "invert": False,           # the camera turns the other way
+    },
     "server": {
         "port": 8765,
         "httpsPort": 8766,
@@ -96,6 +102,8 @@ LIMITS = {
     ("pedals", "clutchReturn"): (0, 5),
     ("ffb", "gain"): (0, 4),
     ("ffb", "pullSpeed"): (0, 3600),
+    ("look", "gain"): (0.5, 8),
+    ("look", "deadzone"): (0, 45),
     ("server", "port"): (1, 65535),
     ("server", "httpsPort"): (1, 65535),
     ("server", "outgaugePort"): (1, 65535),

@@ -21,7 +21,10 @@ BUTTON_CODES = [
     ecodes.BTN_BASE3, ecodes.BTN_BASE4, ecodes.BTN_BASE5, ecodes.BTN_BASE6,
     # Turn signals, added later: codes after the first twelve keep the earlier buttons' numbers.
     ecodes.BTN_TRIGGER_HAPPY1, ecodes.BTN_TRIGGER_HAPPY2,
+    # Pressed by the PC itself when the look direction is recentered (Rigs of Rods: camera reset).
+    ecodes.BTN_TRIGGER_HAPPY3,
 ]
+LOOK_RESET_BIT = 1 << 14
 
 # Wire field -> (axis code, max value)
 AXES = {
@@ -30,6 +33,15 @@ AXES = {
     "b": (ecodes.ABS_Z, PEDAL_MAX),   # brake, 0..1
     "c": (ecodes.ABS_RZ, PEDAL_MAX),  # clutch, 0..1
 }
+
+# Looking around: how fast the game's camera turns, from full left to full right. A code after
+# the pedals' keeps their axis numbers in games that bind by number.
+LOOK_AXIS = ecodes.ABS_RUDDER
+LOOK_MAX = 32767
+# Degrees per second the Rigs of Rods camera turns with the axis fully out.
+LOOK_SPEED = 50.0
+# How quickly the camera catches up with where the phone points, in seconds.
+LOOK_LAG = 0.12
 
 # Effects a game may upload. Constant force is what wheel games (Rigs of Rods included) use
 # for steering force; rumble and periodic effects become phone vibration.
@@ -50,6 +62,7 @@ def create_device() -> UInput:
             (ecodes.ABS_Y, AbsInfo(0, 0, PEDAL_MAX, 0, 0, 0)),
             (ecodes.ABS_Z, AbsInfo(0, 0, PEDAL_MAX, 0, 0, 0)),
             (ecodes.ABS_RZ, AbsInfo(0, 0, PEDAL_MAX, 0, 0, 0)),
+            (LOOK_AXIS, AbsInfo(0, -LOOK_MAX, LOOK_MAX, 0, 0, 0)),
         ],
         ecodes.EV_FF: FF_CODES,
     }
@@ -76,6 +89,11 @@ def parse_state(raw: dict) -> dict:
             state[field] = min(max(value, low), 1.0)
     if "k" in raw:
         state["k"] = int(raw["k"])
+    if "l" in raw:
+        look = float(raw["l"])
+        if not math.isfinite(look):
+            raise ValueError("l is not a number")
+        state["l"] = min(max(look, -180.0), 180.0)
     return state
 
 
@@ -94,6 +112,9 @@ class Wheel:
         self.axes = {code: 0 for code, _ in AXES.values()}
         self.buttons = 0
         self.merged = {field: 0.0 for field in AXES}
+        # Buttons the PC presses itself, on top of the phones'.
+        self.own_buttons = 0
+        self.look = 0
         self.set_curves(post_curves)
 
     def set_curves(self, post_curves: dict) -> None:
@@ -126,7 +147,7 @@ class Wheel:
                 self.device.write(ecodes.EV_ABS, code, value)
                 self.axes[code] = value
                 changed = True
-        buttons = 0
+        buttons = self.own_buttons
         for state in self.phones.values():
             buttons |= state.get("k", 0)
         for index, code in enumerate(BUTTON_CODES):
@@ -138,6 +159,18 @@ class Wheel:
         if changed:
             self.device.syn()
 
+    def look_target(self) -> float | None:
+        """Degrees the phone steering points away from center, or None when no phone sends it."""
+        values = [state["l"] for state in self.phones.values() if "l" in state]
+        return max(values, key=abs) if values else None
+
+    def set_look(self, rate: float) -> None:
+        value = round(min(max(rate, -1.0), 1.0) * LOOK_MAX)
+        if value != self.look:
+            self.device.write(ecodes.EV_ABS, LOOK_AXIS, value)
+            self.device.syn()
+            self.look = value
+
     def resync(self) -> None:
         """Make every reader see the current value of every axis again.
 
@@ -147,13 +180,51 @@ class Wheel:
         Rods among them, assume the middle of the range, which is half brake. Nudging each
         axis by one step and back makes the kernel deliver the real value.
         """
-        for code, max_value in AXES.values():
-            value = self.axes[code]
+        axes = [(code, max_value, self.axes[code]) for code, max_value in AXES.values()]
+        axes.append((LOOK_AXIS, LOOK_MAX, self.look))
+        for code, max_value, value in axes:
             self.device.write(ecodes.EV_ABS, code, value - 1 if value >= max_value else value + 1)
         self.device.syn()
-        for code in self.axes:
-            self.device.write(ecodes.EV_ABS, code, self.axes[code])
+        for code, _, value in axes:
+            self.device.write(ecodes.EV_ABS, code, value)
         self.device.syn()
+
+
+class LookAround:
+    """Turns where the player wants to look into how fast to turn the game's camera.
+
+    Rigs of Rods turns its camera at a speed set by an axis, and doesn't say where it points.
+    So this keeps its own estimate of the camera angle and drives it toward the target, which
+    stays right as long as both start from center: recentering also presses the game's camera
+    reset.
+    """
+
+    def __init__(self, speed: float = LOOK_SPEED, lag: float = LOOK_LAG):
+        self.speed = speed
+        self.lag = lag
+        self.angle = 0.0
+
+    def reset(self) -> None:
+        self.angle = 0.0
+
+    def step(self, target: float, dt: float) -> float:
+        """The axis value (-1..1) for the next dt seconds, positive turning toward +degrees."""
+        rate = (target - self.angle) / (self.speed * self.lag)
+        rate = min(max(rate, -1.0), 1.0)
+        # Too small to move the camera visibly: hold still rather than creep.
+        if abs(target - self.angle) < 0.5:
+            rate = 0.0
+        self.angle += rate * self.speed * dt
+        return rate
+
+
+def look_target(yaw: float, config: dict) -> float:
+    """Camera angle for the steering phone turned yaw degrees from center."""
+    beyond = max(abs(yaw) - config["deadzone"], 0.0)
+    angle = min(beyond * config["gain"], 170.0)
+    if config["invert"]:
+        yaw = -yaw
+    return math.copysign(angle, yaw) if angle else 0.0
 
 
 def _ioctl_number(direction: int, number: int, struct_type) -> int:

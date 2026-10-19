@@ -2,6 +2,7 @@
 
 // The keys keep the project's old name so phones keep their layouts.
 const SETTINGS_KEY = "phone-wheel-settings";
+const SETTINGS_VERSION = 2;
 // The PC's settings as last received, so the page starts right even before it connects.
 const SHARED_KEY = "phone-wheel-shared";
 // Ignore touches this close to the wheel center: the angle is too jumpy there.
@@ -44,9 +45,10 @@ function newDeviceId() {
 
 function loadSettings() {
   const defaults = {
-    // Controls shown on this phone. Another phone can handle the rest.
+    // Controls shown on this phone. Another phone can handle the rest. The shift lever does
+    // what the paddles do, so the paddles start hidden.
     controls: {
-      wheel: true, paddles: true, lever: true, shifter: true, buttons: true,
+      wheel: true, paddles: false, lever: true, shifter: true, buttons: true,
       c: true, b: true, t: true,
     },
     haptics: true,
@@ -63,13 +65,20 @@ function loadSettings() {
     // Buttons (by number) removed one by one in the layout editor.
     hiddenButtons: [],
     deviceId: newDeviceId(),
+    // Bumped when a default changes in a way stored settings should pick up.
+    version: SETTINGS_VERSION,
   };
   try {
     const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     // Earlier versions were landscape only and had a single neutral.
     if (stored.neutral && !stored.neutrals) stored.neutrals = { landscape: stored.neutral };
+    // Before version 2 the paddles showed next to the shift lever by default.
+    if (stored.controls && !stored.version && stored.controls.shifter !== false) {
+      stored.controls.paddles = false;
+    }
     // Older versions also stored the wheel, pedal and curve settings now kept on the PC.
     return {
+      version: SETTINGS_VERSION,
       controls: { ...defaults.controls, ...stored.controls },
       haptics: stored.haptics ?? defaults.haptics,
       neutrals: { ...defaults.neutrals, ...stored.neutrals },
@@ -128,6 +137,7 @@ function sharedDefaults() {
     ],
     lever: { mode: "pulse", autoCancel: true },
     shifter: { upShifts: true },
+    look: { enabled: false, gain: 3, deadzone: 5, invert: false },
   };
 }
 
@@ -277,6 +287,7 @@ wheelZone.addEventListener("pointercancel", releaseWheel);
 
 document.getElementById("recenter").addEventListener("click", () => {
   state.angle = 0;
+  centerLook();
 });
 
 function springBack(dt) {
@@ -453,10 +464,12 @@ function widgetShown(id) {
   return settings.controls[buttonGroup(index)] && !settings.hiddenButtons.includes(index);
 }
 
+function buttonIndexes() {
+  return [...document.querySelectorAll("[data-button]")].map((button) => Number(button.dataset.button));
+}
+
 function groupIndexes(group) {
-  return [...document.querySelectorAll("[data-button]")]
-    .map((button) => Number(button.dataset.button))
-    .filter((index) => buttonGroup(index) === group);
+  return buttonIndexes().filter((index) => buttonGroup(index) === group);
 }
 
 function setWidgetShown(id, shown) {
@@ -793,6 +806,7 @@ function tiltAngles() {
 }
 
 function setNeutral() {
+  centerLook();
   if (!tilt.gravity) return;
   settings.neutrals[orientationKind()] = tiltAngles();
   saveSettings();
@@ -872,14 +886,93 @@ function applyTiltSpeedSteering(offsets, dt) {
 
 // iOS only delivers motion events after an explicit permission request from a tap.
 async function requestMotionPermission() {
-  // DeviceMotionEvent doesn't exist at all on insecure (http://) pages.
-  if (typeof DeviceMotionEvent === "undefined") return;
-  if (typeof DeviceMotionEvent.requestPermission !== "function") return;
-  try {
-    await DeviceMotionEvent.requestPermission();
-  } catch {
-    // Denied or not from a gesture: tilt pedals simply stay at zero.
+  // The events don't exist at all on insecure (http://) pages.
+  for (const type of [globalThis.DeviceMotionEvent, globalThis.DeviceOrientationEvent]) {
+    if (typeof type?.requestPermission !== "function") continue;
+    try {
+      await type.requestPermission();
+    } catch {
+      // Denied or not from a gesture: tilt and look simply stay still.
+    }
   }
+}
+
+// ---------- looking around ----------
+
+// Turning the phone you steer with left or right looks around in the game. The compass
+// gives the direction the back of the phone faces; rolling the phone to steer doesn't change
+// that direction, so steering and looking stay apart.
+const LOOK_SMOOTHING_S = 0.12;
+const LOOK_STALE_MS = 500;
+// Below this share of the back facing sideways (phone close to flat) the direction is noise.
+const LOOK_MIN_LEVEL = 0.4;
+const look = { east: null, north: 0, time: 0, center: null };
+const lookReadout = document.getElementById("look-readout");
+
+function usesLook() {
+  return shared.look.enabled && settings.controls.wheel;
+}
+
+function onCompass(event) {
+  if (event.alpha === null || (event.type === "deviceorientation" && !event.absolute &&
+      event.webkitCompassHeading === undefined)) return;
+  const rad = Math.PI / 180;
+  let east;
+  let north;
+  if (event.webkitCompassHeading !== undefined && event.type === "deviceorientation") {
+    // iOS: the heading of the top edge; good enough while the phone is held upright.
+    const heading = event.webkitCompassHeading * rad;
+    [east, north] = [Math.sin(heading), Math.cos(heading)];
+  } else {
+    const [a, b, g] = [event.alpha * rad, event.beta * rad, event.gamma * rad];
+    // The screen's outward axis in earth coordinates (east, north, up); the back faces the
+    // opposite way.
+    east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
+    north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
+  }
+  const level = Math.hypot(east, north);
+  if (level < LOOK_MIN_LEVEL) return;
+  [east, north] = [east / level, north / level];
+  const now = performance.now();
+  if (look.east === null || now - look.time > LOOK_STALE_MS) {
+    Object.assign(look, { east, north });
+  } else {
+    const k = 1 - Math.exp(-(now - look.time) / 1000 / LOOK_SMOOTHING_S);
+    look.east += (east - look.east) * k;
+    look.north += (north - look.north) * k;
+  }
+  look.time = now;
+  look.center ??= lookHeading();
+}
+window.addEventListener("deviceorientationabsolute", onCompass);
+window.addEventListener("deviceorientation", onCompass);
+
+function lookHeading() {
+  return Math.atan2(look.east, look.north) * 180 / Math.PI;
+}
+
+// Degrees the phone points right of straight ahead, or null without a compass reading.
+function lookYaw() {
+  if (!usesLook() || look.east === null || performance.now() - look.time > LOOK_STALE_MS) {
+    return null;
+  }
+  look.center ??= lookHeading();
+  return ((lookHeading() - look.center + 540) % 360) - 180;
+}
+
+// Straight ahead is wherever the phone points now; the PC puts the game's camera back too.
+function centerLook() {
+  look.center = look.east === null ? null : lookHeading();
+  if (usesLook()) send({ lookCenter: true });
+}
+
+function showLook() {
+  const yaw = lookYaw();
+  lookReadout.hidden = !usesLook();
+  if (lookReadout.hidden) return;
+  let text = `look ${formatDegrees(yaw ?? 0)}`;
+  if (yaw === null) text = window.isSecureContext ? "look: no compass" : "look: needs https";
+  if (lookReadout.textContent !== text) lookReadout.textContent = text;
 }
 
 // ---------- signal lever ----------
@@ -1464,7 +1557,8 @@ function send(message) {
 
 function sendHello() {
   const controls = Object.keys(settings.controls).filter((key) => settings.controls[key]);
-  send({ hello: { id: settings.deviceId, controls } });
+  const buttons = buttonIndexes().filter((index) => widgetShown(`button-${index}`));
+  send({ hello: { id: settings.deviceId, controls, buttons } });
 }
 
 function connect() {
@@ -1490,6 +1584,10 @@ function connect() {
       syncSettingsForm();
     }
     if (message.pong !== undefined) lastRtt = Math.round(performance.now() - message.pong);
+    // The PC's phone list: show or hide one control here.
+    if (message.show && widgets[message.show.widget]) {
+      setWidgetShown(message.show.widget, Boolean(message.show.shown));
+    }
   });
   socket.addEventListener("close", () => {
     setStatus("offline", "reconnecting");
@@ -1575,6 +1673,8 @@ function encodeState() {
   if (controls.paddles || controls.buttons || controls.lever || controls.shifter) {
     message.k = state.buttons | (state.shiftBits || 0);
   }
+  const yaw = lookYaw();
+  if (yaw !== null) message.l = Number(yaw.toFixed(1));
   message.r = raw;
   return JSON.stringify(message);
 }
@@ -1611,6 +1711,7 @@ function frame(now) {
   angleReadout.textContent = `${Math.round(state.angle)}°`;
   showForce();
   showHub();
+  showLook();
   showPedalMarks();
   showGame();
   rumble(now);
@@ -1631,8 +1732,33 @@ const controlInputs = document.querySelectorAll("[data-control]");
 const tiltStatus = document.getElementById("tilt-status");
 let httpsUrl = null;
 
+// One checkbox per button, so each phone can show its own set.
+function syncButtonToggles() {
+  const box = document.getElementById("button-toggles");
+  const indexes = buttonIndexes();
+  if (box.children.length !== indexes.length) {
+    box.replaceChildren(...indexes.map((index) => {
+      const label = document.createElement("label");
+      label.className = "check";
+      const input = Object.assign(document.createElement("input"), { type: "checkbox" });
+      input.dataset.buttonToggle = index;
+      input.addEventListener("change", () => setWidgetShown(`button-${index}`, input.checked));
+      label.append(input, document.createElement("span"));
+      return label;
+    }));
+  }
+  for (const input of box.querySelectorAll("input")) {
+    const index = Number(input.dataset.buttonToggle);
+    input.checked = widgetShown(`button-${index}`);
+    const name = shared.buttons[index] || `Button ${index + 1}`;
+    const span = input.nextElementSibling;
+    if (span.textContent !== name) span.textContent = name;
+  }
+}
+
 function syncSettingsForm() {
   for (const input of controlInputs) input.checked = settings.controls[input.dataset.control];
+  syncButtonToggles();
   hapticsInput.checked = settings.haptics;
   document.getElementById("auto-layout").hidden = !settings.layouts[orientationKind()];
   const used = document.getElementById("programs");
@@ -1657,7 +1783,7 @@ for (const input of controlInputs) {
     syncSettingsForm();
     saveSettings();
     sendHello();
-    if (usesTilt()) requestMotionPermission();
+    if (usesTilt() || usesLook()) requestMotionPermission();
   });
 }
 
@@ -1718,7 +1844,7 @@ document.getElementById("open-settings").addEventListener("click", () => {
   syncSettingsForm();
   dialog.showModal();
   // Turning tilt on from the PC can't ask for sensor access (iOS needs a tap here).
-  if (usesTilt()) requestMotionPermission();
+  if (usesTilt() || usesLook()) requestMotionPermission();
   syncCamera();
 });
 

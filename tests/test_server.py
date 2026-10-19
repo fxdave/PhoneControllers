@@ -121,6 +121,32 @@ def test_phone_to_game_round_trip():
                 phones = [data for kind, data in events if kind == "phones"][-1]
                 assert phones[0]["id"] == "abc"
                 assert phones[0]["controls"] == ["b", "t"]
+
+                # The desktop app picks what a phone shows.
+                await ws.send_json({"hello": {"id": "abc", "controls": ["b", "t"],
+                                              "buttons": [2, 3, "x", 99]}})
+                await asyncio.sleep(0.1)
+                phones = [data for kind, data in events if kind == "phones"][-1]
+                assert phones[0]["buttons"] == [2, 3]
+                server.show_on_phone(phones[0]["key"], "button-4", True)
+                assert (await read_until(ws, "show"))["show"] == {"widget": "button-4",
+                                                                  "shown": True}
+
+                # Looking around: the steering phone turned right turns the camera right
+                # until it gets there, and recentering presses the camera reset.
+                server.config["look"]["enabled"] = True
+                await ws.send_json({"l": 20.0})
+                await asyncio.sleep(0.1)
+                assert server.wheel.look > 0
+                await asyncio.sleep(1.5)
+                assert server.look.angle == pytest.approx(45.0, abs=1.0)
+                assert server.wheel.look == 0
+                await ws.send_json({"lookCenter": True})
+                await asyncio.sleep(0.05)
+                assert server.wheel.buttons & (1 << 14)
+                assert server.look.angle == 0
+                await asyncio.sleep(0.3)
+                assert not server.wheel.buttons & (1 << 14)
             await asyncio.sleep(0.2)
             # The phone left: nothing stays pressed.
             assert server.wheel.output("t") == 0

@@ -121,6 +121,11 @@ button {
   font-size: 12px;
 }
 
+#look-readout {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
 #angle-readout {
   min-width: 5ch;
   font-variant-numeric: tabular-nums;
