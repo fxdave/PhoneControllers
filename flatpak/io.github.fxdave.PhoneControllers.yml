@@ -3,7 +3,7 @@
 # Regenerate python-deps.json after updating the venv: .venv/bin/python flatpak/generate-python-deps.py
 id: io.github.fxdave.PhoneControllers
 runtime: org.gnome.Platform
-runtime-version: '49'
+runtime-version: '51'
 sdk: org.gnome.Sdk
 command: phone-controllers
 finish-args:

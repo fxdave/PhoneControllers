@@ -4,3 +4,4 @@ certs/
 
 build-dir/
 .flatpak-builder/
+repo/

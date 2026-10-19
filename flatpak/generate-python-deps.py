@@ -18,11 +18,11 @@ from pip._vendor.packaging.requirements import Requirement
 from pip._vendor.packaging.utils import canonicalize_name
 
 TOP_LEVEL = ["aiohttp", "evdev", "qrcode"]
-# The GNOME 49 runtime's Python.
-PYTHON = "313"
+# The GNOME 51 runtime's Python.
+PYTHON = "314"
 ARCHES = {"x86_64": "x86_64", "aarch64": "aarch64"}
 MARKER_ENVIRONMENT = {
-    "python_version": "3.13", "python_full_version": "3.13.0", "sys_platform": "linux",
+    "python_version": "3.14", "python_full_version": "3.14.0", "sys_platform": "linux",
     "platform_system": "Linux", "platform_machine": "x86_64", "os_name": "posix",
     "implementation_name": "cpython", "platform_python_implementation": "CPython", "extra": "",
 }
