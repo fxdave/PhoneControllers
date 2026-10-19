@@ -38,10 +38,6 @@ Tested with **Rigs of Rods**, which the app sets up in one click. Other games wo
 controls bound in their own settings, and some only accept specific wheel models or gamepads,
 so they may not see it at all. None has been tried yet; reports are welcome.
 
-> **Honest note:** this is vibecoded, built quickly with an AI assistant, and doesn't chase
-> perfection. A phone isn't the perfect tool for the job either. It's meant to be good enough
-> and a lot of fun.
-
 ## Install
 
 Linux only. A Flathub release is on its way; until then, build the Flatpak:
@@ -103,6 +99,9 @@ feedback (constant, spring, damper, periodic, rumble).
 </details>
 
 ## Contributing
+
+This project is vibecoded: written with an AI assistant, so expect bugs. Bug reports and pull
+requests are welcome.
 
 Run the tests with `.venv/bin/pip install pytest && .venv/bin/python -m pytest`. Releases are
 described in [RELEASING.md](RELEASING.md).
