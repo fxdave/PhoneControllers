@@ -899,41 +899,48 @@ async function requestMotionPermission() {
 
 // ---------- looking around ----------
 
-// Turning the phone you steer with left or right looks around in the game. The compass
-// gives the direction the back of the phone faces; rolling the phone to steer doesn't change
-// that direction, so steering and looking stay apart.
-const LOOK_SMOOTHING_S = 0.12;
+// Turning the phone you steer with left or right looks around in the game. The motion
+// sensors give the direction the back of the phone faces; rolling the phone to steer doesn't
+// change that direction, so steering and looking stay apart.
+//
+// The gyro-based orientation comes first: the compass is thrown off by speakers, the PC or
+// a metal desk, and wanders by tens of degrees. Its own slow drift is taken out by letting
+// straight ahead settle while the phone points close to it.
+const LOOK_SMOOTHING_S = 0.08;
 const LOOK_STALE_MS = 500;
 // Below this share of the back facing sideways (phone close to flat) the direction is noise.
 const LOOK_MIN_LEVEL = 0.4;
-const look = { east: null, north: 0, time: 0, center: null };
+// Within this many degrees of straight ahead, straight ahead follows the phone over seconds.
+const LOOK_SETTLE_DEG = 8;
+const LOOK_SETTLE_S = 6;
+const look = { east: null, north: 0, time: 0, center: null, source: null, gyroTime: -Infinity };
 const lookReadout = document.getElementById("look-readout");
 
 function usesLook() {
   return shared.look.enabled && settings.controls.wheel;
 }
 
-function onCompass(event) {
-  if (event.alpha === null || (event.type === "deviceorientation" && !event.absolute &&
-      event.webkitCompassHeading === undefined)) return;
-  const rad = Math.PI / 180;
-  let east;
-  let north;
-  if (event.webkitCompassHeading !== undefined && event.type === "deviceorientation") {
-    // iOS: the heading of the top edge; good enough while the phone is held upright.
-    const heading = event.webkitCompassHeading * rad;
-    [east, north] = [Math.sin(heading), Math.cos(heading)];
-  } else {
-    const [a, b, g] = [event.alpha * rad, event.beta * rad, event.gamma * rad];
-    // The screen's outward axis in earth coordinates (east, north, up); the back faces the
-    // opposite way.
-    east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
-    north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
+function onOrientation(event) {
+  if (event.alpha === null) return;
+  const now = performance.now();
+  // Chrome on Android: "deviceorientation" is gyro based (relative), the absolute event is
+  // compass based. Elsewhere "deviceorientation" may be absolute; either works.
+  const source = event.type === "deviceorientationabsolute" ? "compass" : "gyro";
+  if (source === "gyro") look.gyroTime = now;
+  else if (now - look.gyroTime < LOOK_STALE_MS) return;
+  if (source !== look.source) {
+    // A different reference direction: straight ahead has to be found again.
+    Object.assign(look, { source, east: null, center: null });
   }
+  const rad = Math.PI / 180;
+  const [a, b, g] = [event.alpha * rad, event.beta * rad, event.gamma * rad];
+  // The screen's outward axis in earth coordinates (east, north, up); the back faces the
+  // opposite way.
+  let east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
+  let north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
   const level = Math.hypot(east, north);
   if (level < LOOK_MIN_LEVEL) return;
   [east, north] = [east / level, north / level];
-  const now = performance.now();
   if (look.east === null || now - look.time > LOOK_STALE_MS) {
     Object.assign(look, { east, north });
   } else {
@@ -944,20 +951,32 @@ function onCompass(event) {
   look.time = now;
   look.center ??= lookHeading();
 }
-window.addEventListener("deviceorientationabsolute", onCompass);
-window.addEventListener("deviceorientation", onCompass);
+window.addEventListener("deviceorientation", onOrientation);
+window.addEventListener("deviceorientationabsolute", onOrientation);
 
 function lookHeading() {
   return Math.atan2(look.east, look.north) * 180 / Math.PI;
 }
 
-// Degrees the phone points right of straight ahead, or null without a compass reading.
+function wrapDegrees(value) {
+  return ((value + 540) % 360) - 180;
+}
+
+// Degrees the phone points right of straight ahead, or null without a reading.
 function lookYaw() {
   if (!usesLook() || look.east === null || performance.now() - look.time > LOOK_STALE_MS) {
     return null;
   }
   look.center ??= lookHeading();
-  return ((lookHeading() - look.center + 540) % 360) - 180;
+  return wrapDegrees(lookHeading() - look.center);
+}
+
+// Called every frame: near straight ahead, straight ahead slowly follows the phone, so the
+// sensors' drift never piles up into a look you aren't doing.
+function settleLook(dt) {
+  const yaw = lookYaw();
+  if (yaw === null || Math.abs(yaw) > LOOK_SETTLE_DEG) return;
+  look.center = wrapDegrees(look.center + yaw * (1 - Math.exp(-dt / LOOK_SETTLE_S)));
 }
 
 // Straight ahead is wherever the phone points now; the PC puts the game's camera back too.
@@ -973,8 +992,9 @@ function showLookStatus() {
     text = "This phone has no steering wheel, so another phone does the looking.";
   } else if (shared.look.enabled) {
     const yaw = lookYaw();
-    if (!window.isSecureContext) text = "Needs the https address for the compass.";
-    else text = yaw === null ? "Waiting for the compass…" : `Looking ${formatDegrees(yaw)}`;
+    if (!window.isSecureContext) text = "Needs the https address for the motion sensors.";
+    else if (yaw === null) text = "Waiting for the motion sensors…";
+    else text = `Looking ${formatDegrees(yaw)}. Tap the look reading at the top to set straight ahead.`;
   }
   if (status.textContent !== text) status.textContent = text;
 }
@@ -984,7 +1004,7 @@ function showLook() {
   lookReadout.hidden = !usesLook();
   if (lookReadout.hidden) return;
   let text = `look ${formatDegrees(yaw ?? 0)}`;
-  if (yaw === null) text = window.isSecureContext ? "look: no compass" : "look: needs https";
+  if (yaw === null) text = window.isSecureContext ? "look: no sensor" : "look: needs https";
   if (lookReadout.textContent !== text) lookReadout.textContent = text;
 }
 
@@ -1724,6 +1744,7 @@ function frame(now) {
   angleReadout.textContent = `${Math.round(state.angle)}°`;
   showForce();
   showHub();
+  settleLook(dt);
   showLook();
   showPedalMarks();
   showGame();
@@ -1833,6 +1854,11 @@ fetch("/info")
     if (info.https_port) httpsUrl = `https://${location.hostname}:${info.https_port}/`;
   })
   .catch(() => {});
+
+lookReadout.addEventListener("click", () => {
+  centerLook();
+  buzz(30);
+});
 
 // Stored on the PC like the hub's steering switch, so every phone and the app agree.
 document.getElementById("look-enabled").addEventListener("change", (event) => {

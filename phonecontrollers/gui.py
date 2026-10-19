@@ -698,9 +698,9 @@ class Window(Adw.ApplicationWindow):
 
     def build_look(self) -> Adw.NavigationPage:
         intro = caption("Turn the phone you steer with left or right, like turning your head, "
-                        "and the game's camera turns with it. It uses the phone's compass, so "
-                        "the phone needs the secure (https) address. Center on the phone sets "
-                        "straight ahead.")
+                        "and the game's camera turns with it. It uses the phone's motion sensors, "
+                        "so the phone needs the secure (https) address. Tapping the look reading "
+                        "on the phone sets straight ahead.")
         main = Adw.PreferencesGroup()
         main.add(self.switch(("look", "enabled"), "Look by turning the phone",
                              "Also switchable in the phone's settings"))

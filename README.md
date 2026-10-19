@@ -30,7 +30,7 @@ itself after the turn, and a sequential gear lever.
 - **No stuck pedals.** When a game opens the wheel, every axis is sent again, so a brake the
   game assumed half-pressed is released.
 - **Look around.** Turn the phone you steer with to the side and the game's camera turns
-  with it, using the phone's compass.
+  with it.
 - **Your layout.** Move, resize and remove every control on the phone, and pick which
   buttons each phone shows.
 
@@ -109,12 +109,14 @@ Turn on **Look around**, in the desktop app (its own page, under the cockpit) or
 phone's Settings. Then turn the phone you steer with left
 or right, like turning your head, and the game's camera follows: at the default setting,
 turning the phone 30° looks 90° to the side. Rolling the phone to steer doesn't move the
-view; the compass only follows where the back of the phone faces. **Center** on the phone
-(or **Set tilt neutral** when the phone is the wheel) makes the current direction straight
-ahead and puts the game's camera back.
+view; only where the back of the phone faces counts. Tapping the **look** reading at the top
+of the phone (or **Center**) makes the current direction straight ahead and puts the game's
+camera back. Straight ahead also settles by itself over a few seconds while you look roughly
+forward, so the sensors' drift doesn't add up.
 
-It needs the phone's compass, so the secure (https) address. In Rigs of Rods the camera
-turns at its own speed, so a quick look takes a moment to catch up.
+It needs the phone's motion sensors, so the secure (https) address. It uses the gyroscope
+rather than the compass, which speakers, the PC or a metal desk throw off. In Rigs of Rods
+the camera turns at its own speed, so a quick look takes a moment to catch up.
 
 ### Camera pedal
 

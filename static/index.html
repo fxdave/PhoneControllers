@@ -15,7 +15,8 @@
     <header id="topbar">
       <span id="status" class="status" data-state="connecting">connecting</span>
       <span id="angle-readout">0°</span>
-      <span id="look-readout" hidden></span>
+      <button class="tool" id="look-readout" type="button" hidden
+        title="Tap to set straight ahead"></button>
       <span id="game-readout" hidden></span>
       <span class="spacer"></span>
       <button class="tool" id="level" type="button" hidden>Set tilt neutral</button>
@@ -175,8 +176,8 @@
             Turn the phone left or right to look around in the game
           </label>
           <p class="hint">
-            Works on the phone with the steering wheel and uses its compass. Center sets
-            straight ahead. More settings are in the PC app, under Look around.
+            Works on the phone with the steering wheel. Tap the look reading at the top (or
+            Center) to set straight ahead. More settings are in the PC app, under Look around.
           </p>
           <p id="look-status" class="hint"></p>
         </fieldset>

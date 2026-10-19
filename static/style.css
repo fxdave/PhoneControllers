@@ -122,8 +122,8 @@ button {
 }
 
 #look-readout {
+  min-width: 10ch;
   color: var(--muted);
-  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 #angle-readout {
