@@ -10,11 +10,10 @@ Phone Controllers ships as a Flatpak on Flathub under the ID
    description of what changed.
 2. If the Python dependencies changed, regenerate the pinned list:
    `.venv/bin/python flatpak/generate-python-deps.py`.
-3. Check the local build and the metadata:
+3. Check the source and the metadata:
 
    ```sh
    .venv/bin/python -m pytest
-   flatpak-builder --user --install --force-clean build-dir flatpak/io.github.fxdave.PhoneControllers.yml
    flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest flatpak/io.github.fxdave.PhoneControllers.yml
    flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream data/io.github.fxdave.PhoneControllers.metainfo.xml
    ```
@@ -23,6 +22,20 @@ Phone Controllers ships as a Flatpak on Flathub under the ID
 5. Write the Flathub manifest for the tag:
    `python3 flatpak/make-flathub-manifest.py v0.1.0 ../flathub-PhoneControllers`.
    It points the app's source at the tag and copies `python-deps.json` next to it.
+6. Build and lint it the way Flathub does. The screenshot and icon checks only pass with
+   Flathub's mirroring options, so a plain local build always fails them:
+
+   ```sh
+   cd ../flathub-PhoneControllers
+   flatpak run --filesystem=$PWD org.flatpak.Builder --force-clean --sandbox --user \
+       --install-deps-from=flathub --compose-url-policy=full \
+       --mirror-screenshots-url=https://dl.flathub.org/media/ --repo=repo \
+       builddir io.github.fxdave.PhoneControllers.yml
+   flatpak run --filesystem=$PWD --command=flatpak-builder-lint org.flatpak.Builder builddir builddir
+   flatpak run --filesystem=$PWD --command=flatpak-builder-lint org.flatpak.Builder repo repo
+   ```
+
+   If the build fails with a FUSE permission error, add `--disable-rofiles-fuse`.
 
 ## First submission
 
