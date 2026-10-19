@@ -40,7 +40,7 @@ so they may not see it at all. None has been tried yet; reports are welcome.
 
 ## Install
 
-Linux only. A Flathub release is on its way; until then, build the Flatpak:
+Linux only. It isn't on Flathub; build the Flatpak:
 
 ```sh
 git clone https://github.com/fxdave/PhoneControllers.git && cd PhoneControllers
