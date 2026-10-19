@@ -123,6 +123,9 @@ def test_phones_may_only_switch_steering_mode():
     assert config.phone_change({"path": ["wheel", "steerMode"], "value": "bogus"}) is None
     assert config.phone_change({"path": ["server", "port"], "value": 1}) is None
     assert config.phone_change("junk") is None
+    assert config.phone_change({"path": ["look", "enabled"], "value": True}) == (
+        ("look", "enabled"), True)
+    assert config.phone_change({"path": ["look", "enabled"], "value": 1}) is None
     changed = config.apply_change(config.sanitize({}), ("wheel", "steerMode"), "gyro")
     assert changed["wheel"]["steerMode"] == "gyro"
 

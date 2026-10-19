@@ -966,6 +966,19 @@ function centerLook() {
   if (usesLook()) send({ lookCenter: true });
 }
 
+function showLookStatus() {
+  const status = document.getElementById("look-status");
+  let text = "";
+  if (shared.look.enabled && !settings.controls.wheel) {
+    text = "This phone has no steering wheel, so another phone does the looking.";
+  } else if (shared.look.enabled) {
+    const yaw = lookYaw();
+    if (!window.isSecureContext) text = "Needs the https address for the compass.";
+    else text = yaw === null ? "Waiting for the compass…" : `Looking ${formatDegrees(yaw)}`;
+  }
+  if (status.textContent !== text) status.textContent = text;
+}
+
 function showLook() {
   const yaw = lookYaw();
   lookReadout.hidden = !usesLook();
@@ -1718,6 +1731,7 @@ function frame(now) {
   if (dialog.open) {
     showTiltStatus(tiltNow);
     showCameraStatus();
+    showLookStatus();
   }
   sendState();
   reloadWhenIdle();
@@ -1758,6 +1772,7 @@ function syncButtonToggles() {
 
 function syncSettingsForm() {
   for (const input of controlInputs) input.checked = settings.controls[input.dataset.control];
+  document.getElementById("look-enabled").checked = shared.look.enabled;
   syncButtonToggles();
   hapticsInput.checked = settings.haptics;
   document.getElementById("auto-layout").hidden = !settings.layouts[orientationKind()];
@@ -1818,6 +1833,17 @@ fetch("/info")
     if (info.https_port) httpsUrl = `https://${location.hostname}:${info.https_port}/`;
   })
   .catch(() => {});
+
+// Stored on the PC like the hub's steering switch, so every phone and the app agree.
+document.getElementById("look-enabled").addEventListener("change", (event) => {
+  const enabled = event.target.checked;
+  shared.look = { ...shared.look, enabled };
+  send({ set: { path: ["look", "enabled"], value: enabled } });
+  if (enabled) {
+    requestMotionPermission();
+    centerLook();
+  }
+});
 
 hapticsInput.addEventListener("change", () => {
   settings.haptics = hapticsInput.checked;

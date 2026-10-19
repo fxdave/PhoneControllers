@@ -177,7 +177,8 @@ class Window(Adw.ApplicationWindow):
 
         self.nav.add(self.build_home())
         for page in (self.build_steering(), *(self.build_pedal(key) for key in "tbc"),
-                     self.build_feedback(), self.build_buttons(), self.build_connection(),
+                     self.build_feedback(), self.build_buttons(), self.build_look(),
+                     self.build_connection(),
                      self.build_log()):
             self.nav.add(page)
 
@@ -295,6 +296,7 @@ class Window(Adw.ApplicationWindow):
         header.pack_start(power_box)
         menu = Gio.Menu()
         menu.append("Buttons & levers", "win.open::buttons")
+        menu.append("Look around", "win.open::look")
         menu.append("Connection", "win.open::connection")
         menu.append("Log", "win.open::log")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
@@ -320,11 +322,11 @@ class Window(Adw.ApplicationWindow):
 
         # Server on: the live cockpit, then phones and the game.
         self.cockpit = Cockpit(lambda part: self.open_page(PART_PAGES[part]))
-        parts = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=6,
-                            row_spacing=6, max_children_per_line=6, halign=Gtk.Align.CENTER)
+        parts = Adw.WrapBox(child_spacing=6, line_spacing=6, align=0.5,
+                            halign=Gtk.Align.CENTER)
         for label, tag in (("Steering", "steering"), ("Gas", "pedal-t"), ("Brake", "pedal-b"),
                            ("Clutch", "pedal-c"), ("Force feedback", "feedback"),
-                           ("Buttons & levers", "buttons")):
+                           ("Buttons & levers", "buttons"), ("Look around", "look")):
             parts.append(pill(label, lambda tag=tag: self.open_page(tag)))
         parts.set_margin_bottom(12)
         cockpit_box = section(self.cockpit, parts, spacing=6)
@@ -677,25 +679,6 @@ class Window(Adw.ApplicationWindow):
 
         self.bind(show_mode_rows)
 
-        look = Adw.PreferencesGroup(
-            title="Look around",
-            description="Turn the phone you steer with left or right and the game's camera "
-                        "turns with it, using the phone's compass. Center on the phone sets "
-                        "straight ahead. Rigs of Rods needs the updated wheel mapping from the "
-                        "home screen.")
-        look.add(self.switch(("look", "enabled"), "Look by turning the phone"))
-        self.look_row = Adw.ActionRow(title="Camera now", subtitle="Straight ahead")
-        look.add(self.look_row)
-        self.bind(lambda: self.look_row.set_visible(self.config["look"]["enabled"]))
-        look_rows = Adw.PreferencesGroup(title="Look around")
-        look_rows.add(self.spin(("look", "gain"), "Camera turn per phone degree",
-                                "At 3, turning the phone 30° looks 90° to the side",
-                                0.5, 8, 0.5, digits=1))
-        look_rows.add(self.spin(("look", "deadzone"), "Ignore the first",
-                                "Degrees of phone turn, so small wobbles don't move the view",
-                                0, 45, 1))
-        look_rows.add(self.switch(("look", "invert"), "Turn the camera the other way"))
-
         editors = Gtk.Box(spacing=18, homogeneous=True)
         editors.append(self.curve_editor("pre", "s", "Tilt to wheel", "phone tilt",
                                          "wheel angle"))
@@ -706,11 +689,36 @@ class Window(Adw.ApplicationWindow):
             rotation,
             section(heading("How you steer"), modes),
             spring,
-            look,
-            fine_tuning(gyro_rows, tilt_rows, look_rows,
+            fine_tuning(gyro_rows, tilt_rows,
                         caption("Curves shape both sides of center alike. The first one only "
                                 "bends tilt steering: a dragged wheel is its own input."),
                         editors))
+
+    # ---------- looking around ----------
+
+    def build_look(self) -> Adw.NavigationPage:
+        intro = caption("Turn the phone you steer with left or right, like turning your head, "
+                        "and the game's camera turns with it. It uses the phone's compass, so "
+                        "the phone needs the secure (https) address. Center on the phone sets "
+                        "straight ahead.")
+        main = Adw.PreferencesGroup()
+        main.add(self.switch(("look", "enabled"), "Look by turning the phone",
+                             "Also switchable in the phone's settings"))
+        self.look_row = Adw.ActionRow(title="Camera now", subtitle="Straight ahead")
+        main.add(self.look_row)
+        self.bind(lambda: self.look_row.set_visible(self.config["look"]["enabled"]))
+        feel = Adw.PreferencesGroup(title="How far it looks")
+        feel.add(self.spin(("look", "gain"), "Camera turn per phone degree",
+                           "At 3, turning the phone 30° looks 90° to the side",
+                           0.5, 8, 0.5, digits=1))
+        feel.add(self.spin(("look", "deadzone"), "Ignore the first",
+                           "Degrees of phone turn, so small wobbles don't move the view",
+                           0, 45, 1))
+        feel.add(self.switch(("look", "invert"), "Turn the camera the other way"))
+        games = caption("Rigs of Rods turns its camera at its own speed, so a quick look takes "
+                        "a moment to catch up. It needs the updated wheel mapping from the home "
+                        "screen. Other games: bind the look axis (ABS_RUDDER) to camera turning.")
+        return self.page("look", "Look around", intro, main, feel, games)
 
     # ---------- pedals ----------
 

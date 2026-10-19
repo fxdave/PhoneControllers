@@ -105,7 +105,8 @@ If the phone can't reach the page, check that a firewall allows TCP ports 8765 a
 
 ### Look around
 
-Turn on **Look around** on the app's Steering page. Then turn the phone you steer with left
+Turn on **Look around**, in the desktop app (its own page, under the cockpit) or in the
+phone's Settings. Then turn the phone you steer with left
 or right, like turning your head, and the game's camera follows: at the default setting,
 turning the phone 30° looks 90° to the side. Rolling the phone to steer doesn't move the
 view; the compass only follows where the back of the phone faces. **Center** on the phone
@@ -153,7 +154,7 @@ numbers and the curve editors sit folded under **Fine-tuning**.
 | | |
 |---|---|
 | <img src="docs/screenshots/light-steering.png" alt="Steering: rotation dial with vehicle presets and three ways to steer"> | <img src="docs/screenshots/light-pedal-b.png" alt="Brake: how you press it, travel markers and feel curves"> |
-| **Steering**: rotation (kart, sports car, road car and truck presets), how you steer, spring back to center, look around. | **Pedals**: touch, tilt or camera; travel (drag the markers beside the pedal); feel. |
+| **Steering**: rotation (kart, sports car, road car and truck presets), how you steer, spring back to center. | **Pedals**: touch, tilt or camera; travel (drag the markers beside the pedal); feel. |
 | <img src="docs/screenshots/dark-feedback.png" alt="Force feedback: strength and live force from the game"> | <img src="docs/screenshots/light-buttons.png" alt="Buttons and levers: signal lever and shift lever modes, button names"> |
 | **Force feedback**: the live force from the game, strength, direction, vibration on rumble. | **Buttons & levers**: how the signal lever presses, which way the gear lever shifts, button names. |
 

@@ -190,7 +190,8 @@ def save(config: dict, path: Path | None = None) -> None:
 
 
 # Settings a phone may change itself (the quick switch in the wheel's hub), with their values.
-PHONE_SETTABLE = {("wheel", "steerMode"): STEER_MODES}
+BOOL = object()
+PHONE_SETTABLE = {("wheel", "steerMode"): STEER_MODES, ("look", "enabled"): BOOL}
 
 
 def phone_change(request) -> tuple[tuple, object] | None:
@@ -200,6 +201,9 @@ def phone_change(request) -> tuple[tuple, object] | None:
     path = tuple(request["path"])
     allowed = PHONE_SETTABLE.get(path)
     value = request.get("value")
+    # bool checks first: 1 == True would otherwise pass for a switch.
+    if allowed is BOOL:
+        return (path, value) if isinstance(value, bool) else None
     return (path, value) if allowed and value in allowed else None
 
 
