@@ -19,6 +19,8 @@ finish-args:
   - --talk-name=org.freedesktop.ScreenSaver
   # One-click Rigs of Rods setup (input map, force feedback).
   - --filesystem=~/.rigsofrods/config:create
+  # One-click install of the BeamNG.drive look around mod.
+  - --filesystem=~/.local/share/BeamNG/BeamNG.drive:create
 modules:
   - python-deps.json
   - name: phone-controllers

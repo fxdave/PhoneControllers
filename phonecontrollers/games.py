@@ -1,12 +1,16 @@
 """Per-game setup the desktop app can do with one click."""
 
 import re
+import zipfile
 from pathlib import Path
 
 from .server import ROOT
 
 ROR_CONFIG_DIR = Path.home() / ".rigsofrods" / "config"
 ROR_MAP = ROOT / "games" / "rigs-of-rods" / "Phone_Controllers_Wheel.map"
+BEAMNG_DIR = Path.home() / ".local" / "share" / "BeamNG" / "BeamNG.drive"
+BEAMNG_MOD = ROOT / "games" / "beamng" / "phone_controllers_look"
+BEAMNG_MOD_ZIP = "phone_controllers_look.zip"
 
 
 def ror_found() -> bool:
@@ -60,3 +64,36 @@ def enable_ror_force_feedback() -> None:
         if not count:
             text = text + ("" if not text or text.endswith("\n") else "\n") + line + "\n"
     path.write_text(text)
+
+
+def beamng_found() -> bool:
+    return BEAMNG_DIR.is_dir()
+
+
+def _beamng_mod_files() -> dict[str, bytes]:
+    return {path.relative_to(BEAMNG_MOD).as_posix(): path.read_bytes()
+            for path in sorted(BEAMNG_MOD.rglob("*")) if path.is_file()}
+
+
+def beamng_mod_state() -> str:
+    """"installed", "outdated" (an older copy of the mod) or "missing"."""
+    target = BEAMNG_DIR / "current" / "mods" / BEAMNG_MOD_ZIP
+    try:
+        with zipfile.ZipFile(target) as archive:
+            found = {name: archive.read(name) for name in archive.namelist()}
+    except (OSError, zipfile.BadZipFile):
+        return "missing"
+    return "installed" if found == _beamng_mod_files() else "outdated"
+
+
+def install_beamng_mod() -> Path:
+    """The mod that lets the camera follow the phone directly, as a zip in the user folder like
+    any other mod. The game notices it while running, or at the next start."""
+    target = BEAMNG_DIR / "current" / "mods" / BEAMNG_MOD_ZIP
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in _beamng_mod_files().items():
+            archive.writestr(name, content)
+    temporary.replace(target)
+    return target

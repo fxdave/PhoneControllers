@@ -18,6 +18,10 @@ APP_DIR_NAME = "phone-controllers"
 OLD_APP_DIR_NAME = "phone-wheel"
 
 STEER_MODES = ("touch", "tilt-speed", "gyro")
+# Which side of the phone points forward when looking around.
+LOOK_AXES = ("back", "screen", "top", "bottom", "left", "right")
+# How the look direction reaches the game: a joystick axis, or the BeamNG.drive mod.
+LOOK_OUTPUTS = ("axis", "beamng")
 LEVER_MODES = ("pulse", "hold")
 PEDAL_MODES = ("touch", "away", "toward", "left", "right", "camera")
 PEDAL_KEYS = ("c", "b", "t")
@@ -79,6 +83,13 @@ DEFAULTS = {
         "gain": 3.0,               # degrees the camera turns per degree the phone turns
         "deadzone": 5,             # degrees of phone turn ignored around center
         "invert": False,           # the camera turns the other way
+        "nod": False,              # nodding looks up and down too (with the BeamNG.drive mod)
+        "nodGain": 1.0,            # degrees the camera tilts per degree the phone tilts
+        "nodInvert": False,        # the camera tilts the other way
+        "axis": "back",            # the side of the phone that points forward
+        "smoothing": 80,           # milliseconds; less is quicker, more hides sensor jitter
+        "settle": True,            # straight ahead slowly follows the phone, against sensor drift
+        "output": "axis",          # "axis" (any game) or "beamng" (instant, needs the mod)
     },
     "server": {
         "port": 8765,
@@ -105,6 +116,8 @@ LIMITS = {
     ("ffb", "pullSpeed"): (0, 3600),
     ("look", "gain"): (0.5, 8),
     ("look", "deadzone"): (0, 45),
+    ("look", "nodGain"): (0.5, 8),
+    ("look", "smoothing"): (0, 200),
     ("server", "port"): (1, 65535),
     ("server", "httpsPort"): (1, 65535),
     ("server", "outgaugePort"): (1, 65535),
@@ -155,7 +168,8 @@ def _merge(default, stored, path=()):
         value = min(max(stored, low), high)
         return int(value) if isinstance(default, int) and float(value).is_integer() else value
     if isinstance(default, str):
-        allowed = {("wheel", "steerMode"): STEER_MODES, ("lever", "mode"): LEVER_MODES}.get(path)
+        allowed = {("wheel", "steerMode"): STEER_MODES, ("lever", "mode"): LEVER_MODES,
+                   ("look", "axis"): LOOK_AXES, ("look", "output"): LOOK_OUTPUTS}.get(path)
         if path[:2] == ("pedals", "modes"):
             allowed = PEDAL_MODES
         if not isinstance(stored, str) or (allowed and stored not in allowed):

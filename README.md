@@ -18,8 +18,8 @@ device a plugged-in wheel is. No app on the phone, no driver on the PC.
 - **Several phones.** One as the wheel, one on the floor as pedals.
 - **Two ways to steer.** Drag the wheel with your thumb, or hold the phone and turn it like
   a real wheel.
-- **Look around.** Turn the phone to the side and the camera looks out the side window
-  (Rigs of Rods for now).
+- **Look around.** Turn the phone to the side, in your hand or worn on your head, and the
+  camera looks out the side window (Rigs of Rods, and BeamNG.drive with its mod).
 - **Three ways to press a pedal.** Slide a finger, tilt the phone, or cover its back camera.
 - **Driving details.** A clutch with a bite point, indicators that cancel after the turn,
   and a gear lever.
@@ -62,6 +62,8 @@ python -m venv --system-site-packages .venv
 ```
 
 `.venv/bin/python server.py` runs it without a window.
+
+On NixOS, use `shell.nix` instead of a venv: `nix-shell --run "python -m phonecontrollers"`.
 </details>
 
 ## Start driving
@@ -72,6 +74,22 @@ python -m venv --system-site-packages .venv
 3. Tap **Fullscreen** and drive.
 
 The app walks you through the rest, including one-click setup for Rigs of Rods.
+
+### Looking around with the phone on your head in BeamNG.drive
+
+1. Close the game, then install the **BeamNG.drive: look around mod** from the home screen of
+   the app. It works with the native Linux version of the game.
+2. Under **Look around**, turn on **Look by turning the phone**, set **Send to the game by** to
+   **BeamNG.drive mod**, and set **Side pointing forward** to match the mount (**Top edge** for
+   a phone lying flat with its screen up).
+3. For ±270° at ±45° of head turn, set **Camera turn per phone degree** to 6 and **Ignore the
+   first** to 0.
+4. To look up and down too, turn on **Nod to look up and down**.
+5. Face the monitor and press **Set straight ahead** in the app. Turning off **Let straight
+   ahead follow slowly** stops small held turns sliding back, but press **Set** when the
+   sensors have drifted.
+
+The phone that looks is the one with the steering wheel, or one with all its controls hidden.
 
 ### If the app can't create the wheel
 
@@ -103,7 +121,8 @@ feedback (constant, spring, damper, periodic, rumble).
 Note: The project is vibecoded without the need for perfection, as phones are not perfect
 controllers either. Bug reports and pull requests are welcome.
 
-Run the tests with `.venv/bin/pip install pytest && .venv/bin/python -m pytest`. Releases are
+Run the tests with `.venv/bin/pip install pytest && .venv/bin/python -m pytest`, or
+`nix-shell --run "python -m pytest"` on NixOS. Releases are
 described in [RELEASING.md](RELEASING.md).
 
 ## License

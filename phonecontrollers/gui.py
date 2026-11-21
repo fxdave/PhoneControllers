@@ -252,6 +252,15 @@ class Window(Adw.ApplicationWindow):
         self.bind(lambda: row.set_active(self.get(path)))
         return row
 
+    def choice(self, path, title, subtitle, choices) -> Adw.ComboRow:
+        """A setting with named values; choices are (value, label) pairs."""
+        row = Adw.ComboRow(title=title, subtitle=subtitle,
+                           model=Gtk.StringList.new([label for _, label in choices]))
+        values = [value for value, _ in choices]
+        row.connect("notify::selected", lambda r, _p: self.change(path, values[r.get_selected()]))
+        self.bind(lambda: row.set_selected(values.index(self.get(path))))
+        return row
+
     def cards(self, path, choices) -> CardRow:
         row = CardRow(choices, lambda value: self.change(path, value))
         self.bind(lambda: row.select(self.get(path)))
@@ -548,6 +557,32 @@ class Window(Adw.ApplicationWindow):
             if not on:
                 row.add_suffix(pill("Turn on", self.enable_ror_force_feedback))
             self.game_list.append(row)
+        if games.beamng_found():
+            state = games.beamng_mod_state()
+            row = Adw.ActionRow(title="BeamNG.drive: look around mod",
+                                subtitle={"installed": "Installed",
+                                          "outdated": "An older version is installed",
+                                          "missing": "Lets the view follow the phone "
+                                                     "instantly"}[state])
+            row.add_prefix(Gtk.Image(icon_name="object-select-symbolic" if state == "installed"
+                                     else "dialog-information-symbolic"))
+            if state != "installed":
+                row.add_suffix(pill("Install" if state == "missing" else "Update",
+                                    self.install_beamng_mod))
+            self.game_list.append(row)
+
+    def install_beamng_mod(self) -> None:
+        # Replacing the zip under a running game can leave its camera broken until it restarts.
+        if any("beamng" in program["name"].lower() for program in self.programs):
+            self.toast("Close BeamNG.drive first, then install the mod.")
+            return
+        try:
+            games.install_beamng_mod()
+        except OSError as error:
+            self.toast(f"Couldn't install the mod: {error}")
+            return
+        self.toast("Mod installed. It works the next time BeamNG.drive starts.")
+        self.show_game_setup()
 
     def install_ror_map(self) -> None:
         try:
@@ -586,6 +621,9 @@ class Window(Adw.ApplicationWindow):
         if angle is not None:
             side = "right" if angle > 0 else "left"
             text = f"{abs(angle)}° to the {side}" if angle else "Straight ahead"
+            tilt = monitor.get("nod")
+            if tilt:
+                text += f", {abs(tilt)}° {'up' if tilt > 0 else 'down'}"
             if self.look_row.get_subtitle() != text:
                 self.look_row.set_subtitle(text)
 
@@ -697,16 +735,32 @@ class Window(Adw.ApplicationWindow):
     # ---------- looking around ----------
 
     def build_look(self) -> Adw.NavigationPage:
-        intro = caption("Turn the phone you steer with left or right, like turning your head, "
-                        "and the game's camera turns with it. It uses the phone's motion sensors, "
-                        "so the phone needs the secure (https) address. Tapping the look reading "
-                        "on the phone sets straight ahead.")
+        intro = caption("Turn the phone left or right, by hand or worn on your head, and the "
+                        "game's camera turns with it. The phone with the steering wheel does "
+                        "this, or one with all its controls hidden. It uses the motion sensors, "
+                        "so the phone needs the secure (https) address.")
         main = Adw.PreferencesGroup()
         main.add(self.switch(("look", "enabled"), "Look by turning the phone",
                              "Also switchable in the phone's settings"))
         self.look_row = Adw.ActionRow(title="Camera now", subtitle="Straight ahead")
         main.add(self.look_row)
         self.bind(lambda: self.look_row.set_visible(self.config["look"]["enabled"]))
+        center = Adw.ActionRow(title="Set straight ahead",
+                               subtitle="Wherever the phone points now, for a phone out of "
+                                        "reach. Tapping the look reading on the phone does "
+                                        "the same.")
+        center.add_suffix(pill("Set", lambda: self.app.runner.call(
+            lambda server: server.center_look_from_pc())))
+        main.add(center)
+        main.add(self.choice(("look", "axis"), "Side pointing forward",
+                             "Top if the phone lies flat on your head with its screen up",
+                             [("back", "Back"), ("screen", "Screen"), ("top", "Top edge"),
+                              ("bottom", "Bottom edge"), ("left", "Left edge"),
+                              ("right", "Right edge")]))
+        main.add(self.choice(("look", "output"), "Send to the game by",
+                             "The mod sets the view directly, so it has no delay and no "
+                             "limit on how far it turns",
+                             [("axis", "Joystick axis"), ("beamng", "BeamNG.drive mod")]))
         feel = Adw.PreferencesGroup(title="How far it looks")
         feel.add(self.spin(("look", "gain"), "Camera turn per phone degree",
                            "At 3, turning the phone 30° looks 90° to the side",
@@ -714,10 +768,26 @@ class Window(Adw.ApplicationWindow):
         feel.add(self.spin(("look", "deadzone"), "Ignore the first",
                            "Degrees of phone turn, so small wobbles don't move the view",
                            0, 45, 1))
-        feel.add(self.switch(("look", "invert"), "Turn the camera the other way"))
-        games = caption("Rigs of Rods turns its camera at its own speed, so a quick look takes "
-                        "a moment to catch up. It needs the updated wheel mapping from the home "
-                        "screen. Other games: bind the look axis (ABS_RUDDER) to camera turning.")
+        feel.add(self.switch(("look", "invert"), "Reversed",
+                             "Turning the phone right looks left"))
+        feel.add(self.switch(("look", "nod"), "Nod to look up and down",
+                             "Needs the BeamNG.drive mod"))
+        feel.add(self.spin(("look", "nodGain"), "Camera tilt per phone degree",
+                           "Up to 85° up or down", 0.5, 8, 0.5, digits=1))
+        feel.add(self.switch(("look", "nodInvert"), "Nod reversed",
+                             "Nodding down looks up"))
+        feel.add(self.spin(("look", "smoothing"), "Smoothing",
+                           "Milliseconds. Less is quicker, more hides sensor jitter, which a "
+                           "high camera turn magnifies",
+                           0, 200, 5))
+        feel.add(self.switch(("look", "settle"), "Let straight ahead follow slowly",
+                             "Takes out sensor drift, but a small turn you hold slides back "
+                             "to center"))
+        games = caption("With the joystick axis, the camera turns at the game's own speed and "
+                        "up to 170°, so a quick look takes a moment to catch up. Rigs of Rods "
+                        "needs the updated wheel mapping from the home screen. Other games: bind "
+                        "the look axis (ABS_RUDDER) to camera turning. BeamNG.drive: install "
+                        "the mod from the home screen.")
         return self.page("look", "Look around", intro, main, feel, games)
 
     # ---------- pedals ----------

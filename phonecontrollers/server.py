@@ -22,6 +22,7 @@ from . import config as settings
 from .inhibit import IdleInhibitor
 from .device import (
     AXES, LOOK_RESET_BIT, ForceFeedback, LookAround, Wheel, create_device, look_target,
+    nod_target_angle,
     parse_state,
 )
 from .outgauge import OutGaugeProtocol
@@ -42,12 +43,17 @@ MONITOR_INTERVAL = 1 / 20
 LOOK_INTERVAL = 1 / 60
 # How long the game's camera reset button is held when the look direction is recentered.
 LOOK_RESET_PRESS = 0.15
+# Where the BeamNG.drive mod (games/beamng) listens for the camera's turn and tilt in degrees.
+BEAMNG_LOOK_ADDRESS = ("127.0.0.1", 4445)
+# The mod lets go of the view when it hears nothing for a while, so an unchanged angle is
+# repeated this often.
+BEAMNG_LOOK_REPEAT = 0.25
 # After a game opens the device, resync the axes after these delays: the game may still be
 # setting up when it opens it, and some open, close and reopen while probing.
 RESYNC_DELAYS = (0.3, 1.5)
 
 FIELD_NAMES = {"s": "steering", "t": "gas", "b": "brake", "c": "clutch", "k": "buttons",
-               "l": "look around"}
+               "l": "look around", "n": "look up and down"}
 
 
 def data_dir() -> Path:
@@ -179,6 +185,11 @@ class Server:
         self.inhibitor = IdleInhibitor(self.log)
         self._awake_lock = asyncio.Lock()
         self.look = LookAround()
+        self._look_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._look_socket.setblocking(False)
+        self._mod_look: tuple[float, float] | None = None
+        self.nod_angle = 0.0
+        self._mod_look_time = 0.0
         self._programs_task: asyncio.Future | None = None
         self._programs_dirty = False
 
@@ -319,6 +330,7 @@ class Server:
                 "output": {key: round(self.wheel.output(key), 4) for key in AXES},
                 "buttons": self.wheel.buttons,
                 "look": round(self.look.angle) if self.config["look"]["enabled"] else None,
+                "nod": round(self.nod_angle),
                 "ff": self._last_forces or self.forces(),
             }
             if monitor != last:
@@ -379,6 +391,8 @@ class Server:
                 first = not phone.state and state
                 phone.state = state
                 self.wheel.update(ws, state)
+                # Right away rather than on the next tick: every millisecond shows here.
+                self.send_mod_look()
                 if set(state) != sends:
                     sends = set(state)
                     names = ", ".join(FIELD_NAMES[key] for key in state) or "nothing"
@@ -442,10 +456,53 @@ class Server:
             await asyncio.sleep(LOOK_INTERVAL)
             now = time.monotonic()
             options = self.config["look"]
-            yaw = self.wheel.look_target()
-            target = look_target(yaw, options) if options["enabled"] and yaw is not None else 0.0
-            self.wheel.set_look(self.look.step(target, now - last))
+            if options["output"] == "beamng":
+                self.wheel.set_look(0.0)
+                self.send_mod_look()
+            else:
+                self.send_mod_look()
+                yaw = self.wheel.look_target()
+                target = look_target(yaw, options) if options["enabled"] and yaw is not None \
+                    else 0.0
+                self.wheel.set_look(self.look.step(target, now - last))
             last = now
+
+    def send_mod_look(self) -> None:
+        """Tells the BeamNG.drive mod the camera angle. It sets the view directly, so it needs
+        no speed estimate and no limit."""
+        options = self.config["look"]
+        if options["output"] != "beamng":
+            if self._mod_look is not None:
+                # Switched away: let go of the view, and the axis starts from center.
+                self._mod_look = None
+                self.look.reset()
+                self.nod_angle = 0.0
+                self._send_mod_angle(0.0, 0.0)
+            return
+        yaw = self.wheel.look_target() if self.wheel else None
+        angle = 0.0
+        if options["enabled"] and yaw is not None:
+            angle = look_target(yaw, options, limit=None)
+        nod = self.wheel.nod_target() if self.wheel else None
+        tilt = 0.0
+        if options["enabled"] and options["nod"] and nod is not None:
+            tilt = nod_target_angle(nod, options)
+        now = time.monotonic()
+        if (angle, tilt) != self._mod_look or now - self._mod_look_time >= BEAMNG_LOOK_REPEAT:
+            self._mod_look, self._mod_look_time = (angle, tilt), now
+            self.look.angle, self.nod_angle = angle, tilt
+            self._send_mod_angle(angle, tilt)
+
+    def _send_mod_angle(self, angle: float, tilt: float) -> None:
+        # Nothing listening (game closed, mod not installed) is fine, and so is a full buffer.
+        with contextlib.suppress(OSError):
+            self._look_socket.sendto(f"{angle:.2f} {tilt:.2f}".encode(), BEAMNG_LOOK_ADDRESS)
+
+    def center_look_from_pc(self) -> None:
+        """The desktop app's button, for a phone that is out of reach: straight ahead becomes
+        wherever each phone points now."""
+        self.look_center()
+        asyncio.ensure_future(self.send_all({"lookCenter": True}))
 
     def look_center(self) -> None:
         """The phone's straight-ahead was set again: put the game's camera back too."""
@@ -453,8 +510,10 @@ class Server:
         # Until the phone's next state arrives, its last look angle is from before the reset.
         for state in self.wheel.phones.values():
             state.pop("l", None)
+            state.pop("n", None)
         self.wheel.set_look(0.0)
-        if not self.config["look"]["enabled"]:
+        self.send_mod_look()
+        if not self.config["look"]["enabled"] or self.config["look"]["output"] != "axis":
             return
         self.wheel.own_buttons |= LOOK_RESET_BIT
         self.wheel.emit()

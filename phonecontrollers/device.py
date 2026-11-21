@@ -42,6 +42,11 @@ LOOK_MAX = 32767
 LOOK_SPEED = 50.0
 # How quickly the camera catches up with where the phone points, in seconds.
 LOOK_LAG = 0.12
+# The camera angle the look axis goes up to. The axis only sets a speed, so the game's camera
+# and this estimate have to stay in step; past half a turn nobody could tell them apart.
+LOOK_AXIS_LIMIT = 170.0
+# How far up or down the view tilts: any further and up would turn into down.
+LOOK_NOD_LIMIT = 85.0
 
 # Effects a game may upload. Constant force is what wheel games (Rigs of Rods included) use
 # for steering force; rumble and periodic effects become phone vibration.
@@ -94,6 +99,11 @@ def parse_state(raw: dict) -> dict:
         if not math.isfinite(look):
             raise ValueError("l is not a number")
         state["l"] = min(max(look, -180.0), 180.0)
+    if "n" in raw:
+        nod = float(raw["n"])
+        if not math.isfinite(nod):
+            raise ValueError("n is not a number")
+        state["n"] = min(max(nod, -180.0), 180.0)
     return state
 
 
@@ -164,6 +174,11 @@ class Wheel:
         values = [state["l"] for state in self.phones.values() if "l" in state]
         return max(values, key=abs) if values else None
 
+    def nod_target(self) -> float | None:
+        """Degrees the phone looking around tilts up from level, or None when no phone sends it."""
+        values = [state["n"] for state in self.phones.values() if "n" in state]
+        return max(values, key=abs) if values else None
+
     def set_look(self, rate: float) -> None:
         value = round(min(max(rate, -1.0), 1.0) * LOOK_MAX)
         if value != self.look:
@@ -218,13 +233,21 @@ class LookAround:
         return rate
 
 
-def look_target(yaw: float, config: dict) -> float:
+def look_target(yaw: float, config: dict, limit: float | None = LOOK_AXIS_LIMIT) -> float:
     """Camera angle for the steering phone turned yaw degrees from center."""
     beyond = max(abs(yaw) - config["deadzone"], 0.0)
-    angle = min(beyond * config["gain"], 170.0)
+    angle = beyond * config["gain"]
+    if limit is not None:
+        angle = min(angle, limit)
     if config["invert"]:
         yaw = -yaw
     return math.copysign(angle, yaw) if angle else 0.0
+
+
+def nod_target_angle(nod: float, config: dict) -> float:
+    """Camera tilt for the phone tilted nod degrees from level, positive looking up."""
+    return look_target(nod, {"deadzone": config["deadzone"], "gain": config["nodGain"],
+                             "invert": config["nodInvert"]}, limit=LOOK_NOD_LIMIT)
 
 
 def _ioctl_number(direction: int, number: int, struct_type) -> int:

@@ -137,7 +137,11 @@ function sharedDefaults() {
     ],
     lever: { mode: "pulse", autoCancel: true },
     shifter: { upShifts: true },
-    look: { enabled: false, gain: 3, deadzone: 5, invert: false },
+    look: {
+      enabled: false, gain: 3, deadzone: 5, invert: false,
+      axis: "back", smoothing: 80, settle: true, output: "axis",
+      nod: false, nodGain: 1, nodInvert: false,
+    },
   };
 }
 
@@ -899,25 +903,52 @@ async function requestMotionPermission() {
 
 // ---------- looking around ----------
 
-// Turning the phone you steer with left or right looks around in the game. The motion
-// sensors give the direction the back of the phone faces; rolling the phone to steer doesn't
-// change that direction, so steering and looking stay apart.
+// Turning the phone left or right looks around in the game. The motion sensors give the
+// direction the chosen side of the phone points. The default is the back: rolling the phone to
+// steer doesn't change that direction, so steering and looking stay apart. A phone worn flat
+// on the head, screen up, points its top forward instead.
 //
 // The gyro-based orientation comes first: the compass is thrown off by speakers, the PC or
 // a metal desk, and wanders by tens of degrees. Its own slow drift is taken out by letting
 // straight ahead settle while the phone points close to it.
-const LOOK_SMOOTHING_S = 0.08;
 const LOOK_STALE_MS = 500;
-// Below this share of the back facing sideways (phone close to flat) the direction is noise.
+// Below this share of the chosen side pointing sideways (it points up or down instead) the
+// direction is noise.
 const LOOK_MIN_LEVEL = 0.4;
 // Within this many degrees of straight ahead, straight ahead follows the phone over seconds.
 const LOOK_SETTLE_DEG = 8;
 const LOOK_SETTLE_S = 6;
-const look = { east: null, north: 0, time: 0, center: null, source: null, gyroTime: -Infinity };
+const look = {
+  east: null, north: 0, time: 0, center: null, source: null, gyroTime: -Infinity,
+  axis: null, upright: false, pitch: null, pitchCenter: null,
+};
 const lookReadout = document.getElementById("look-readout");
 
 function usesLook() {
-  return shared.look.enabled && settings.controls.wheel;
+  if (!shared.look.enabled) return false;
+  // The steering phone, or a phone with no controls at all, worn only to look around. Other
+  // phones (pedals on the floor) move around for other reasons.
+  return settings.controls.wheel || !Object.values(settings.controls).some(Boolean);
+}
+
+// Where one side of the phone points in earth coordinates, [east, north, up]: a column of the
+// rotation matrix for the alpha, beta, gamma of an orientation event, signed for the side.
+function lookAxisDirection(axis, alpha, beta, gamma) {
+  const [sa, ca] = [Math.sin(alpha), Math.cos(alpha)];
+  const [sb, cb] = [Math.sin(beta), Math.cos(beta)];
+  const [sg, cg] = [Math.sin(gamma), Math.cos(gamma)];
+  const right = [ca * cg - sa * sb * sg, sa * cg + ca * sb * sg, -cb * sg];
+  const top = [-sa * cb, ca * cb, sb];
+  const screen = [ca * sg + sa * sb * cg, sa * sg - ca * sb * cg, cb * cg];
+  const negative = ([east, north, up]) => [-east, -north, -up];
+  switch (axis) {
+    case "top": return top;
+    case "bottom": return negative(top);
+    case "right": return right;
+    case "left": return negative(right);
+    case "screen": return screen;
+    default: return negative(screen);
+  }
 }
 
 function onOrientation(event) {
@@ -927,28 +958,36 @@ function onOrientation(event) {
   // compass based. Elsewhere "deviceorientation" may be absolute; either works.
   const source = event.type === "deviceorientationabsolute" ? "compass" : "gyro";
   if (source === "gyro") look.gyroTime = now;
-  else if (now - look.gyroTime < LOOK_STALE_MS) return;
-  if (source !== look.source) {
+  // Once the gyro has spoken, stay with it: it goes quiet while the phone holds still, and the
+  // compass taking over would move straight ahead.
+  else if (look.gyroTime > -Infinity) return;
+  const axis = shared.look.axis ?? "back";
+  if (source !== look.source || axis !== look.axis) {
     // A different reference direction: straight ahead has to be found again.
-    Object.assign(look, { source, east: null, center: null });
+    Object.assign(look, { source, axis, east: null, center: null, pitch: null, pitchCenter: null });
   }
   const rad = Math.PI / 180;
-  const [a, b, g] = [event.alpha * rad, event.beta * rad, event.gamma * rad];
-  // The screen's outward axis in earth coordinates (east, north, up); the back faces the
-  // opposite way.
-  let east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
-  let north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
+  let [east, north, up] = lookAxisDirection(axis, event.alpha * rad, event.beta * rad, event.gamma * rad);
+  // How much of the new reading counts: all of it after a pause, as there's nothing to smooth.
+  const smoothing = (shared.look.smoothing ?? 80) / 1000;
+  const k = smoothing > 0 && now - look.time <= LOOK_STALE_MS
+    ? 1 - Math.exp(-(now - look.time) / 1000 / smoothing) : 1;
+  look.time = now;
+  // The tilt comes from gravity, so it doesn't drift and stays good when the heading can't be
+  // told.
+  const pitch = Math.asin(Math.max(-1, Math.min(1, up))) / rad;
+  look.pitch = look.pitch === null ? pitch : look.pitch + (pitch - look.pitch) * k;
+  look.pitchCenter ??= look.pitch;
   const level = Math.hypot(east, north);
-  if (level < LOOK_MIN_LEVEL) return;
+  look.upright = level < LOOK_MIN_LEVEL;
+  if (look.upright) return;
   [east, north] = [east / level, north / level];
-  if (look.east === null || now - look.time > LOOK_STALE_MS) {
+  if (look.east === null) {
     Object.assign(look, { east, north });
   } else {
-    const k = 1 - Math.exp(-(now - look.time) / 1000 / LOOK_SMOOTHING_S);
     look.east += (east - look.east) * k;
     look.north += (north - look.north) * k;
   }
-  look.time = now;
   look.center ??= lookHeading();
 }
 window.addEventListener("deviceorientation", onOrientation);
@@ -964,36 +1003,46 @@ function wrapDegrees(value) {
 
 // Degrees the phone points right of straight ahead, or null without a reading.
 function lookYaw() {
-  if (!usesLook() || look.east === null || performance.now() - look.time > LOOK_STALE_MS) {
-    return null;
-  }
+  // No event for a while isn't a lost sensor: browsers can send none while the phone holds
+  // still. The last direction stands until the next one.
+  if (!usesLook() || look.east === null) return null;
   look.center ??= lookHeading();
   return wrapDegrees(lookHeading() - look.center);
+}
+
+// Degrees the phone tilts up from where straight ahead was set, or null without a reading.
+function lookPitch() {
+  if (!usesLook() || !shared.look.nod || look.pitch === null) return null;
+  return look.pitch - look.pitchCenter;
 }
 
 // Called every frame: near straight ahead, straight ahead slowly follows the phone, so the
 // sensors' drift never piles up into a look you aren't doing.
 function settleLook(dt) {
+  if (shared.look.settle === false) return;
   const yaw = lookYaw();
   if (yaw === null || Math.abs(yaw) > LOOK_SETTLE_DEG) return;
   look.center = wrapDegrees(look.center + yaw * (1 - Math.exp(-dt / LOOK_SETTLE_S)));
 }
 
 // Straight ahead is wherever the phone points now; the PC puts the game's camera back too.
-function centerLook() {
+function centerLook(tellPc = true) {
   look.center = look.east === null ? null : lookHeading();
-  if (usesLook()) send({ lookCenter: true });
+  look.pitchCenter = look.pitch;
+  if (tellPc && usesLook()) send({ lookCenter: true });
 }
 
 function showLookStatus() {
   const status = document.getElementById("look-status");
   let text = "";
-  if (shared.look.enabled && !settings.controls.wheel) {
-    text = "This phone has no steering wheel, so another phone does the looking.";
+  if (shared.look.enabled && !usesLook()) {
+    text = "This phone has other controls but no steering wheel, so another phone does the looking. Hide all its controls to look with it.";
   } else if (shared.look.enabled) {
     const yaw = lookYaw();
     if (!window.isSecureContext) text = "Needs the https address for the motion sensors.";
-    else if (yaw === null) text = "Waiting for the motion sensors…";
+    else if (look.upright) {
+      text = "The side of the phone chosen in the PC app points up or down. Choose the side that points forward.";
+    } else if (yaw === null) text = "Waiting for the motion sensors…";
     else text = `Looking ${formatDegrees(yaw)}. Tap the look reading at the top to set straight ahead.`;
   }
   if (status.textContent !== text) status.textContent = text;
@@ -1004,7 +1053,11 @@ function showLook() {
   lookReadout.hidden = !usesLook();
   if (lookReadout.hidden) return;
   let text = `look ${formatDegrees(yaw ?? 0)}`;
+  const nod = lookPitch();
+  if (nod !== null) text += ` nod ${formatDegrees(nod)}`;
   if (yaw === null) text = window.isSecureContext ? "look: no sensor" : "look: needs https";
+  // The chosen side points up or down, so the view holds until it points sideways again.
+  if (look.upright) text = `${text} (too steep)`;
   if (lookReadout.textContent !== text) lookReadout.textContent = text;
 }
 
@@ -1607,6 +1660,8 @@ function connect() {
     const message = JSON.parse(event.data);
     if (message.version) checkVersion(message.version);
     if (message.config) applyShared(message.config);
+    // The PC app's button; the PC already put the game's camera back.
+    if (message.lookCenter) centerLook(false);
     if (message.ff) Object.assign(feedback, message.ff);
     if (message.game) {
       game.packet = message.game;
@@ -1707,7 +1762,10 @@ function encodeState() {
     message.k = state.buttons | (state.shiftBits || 0);
   }
   const yaw = lookYaw();
-  if (yaw !== null) message.l = Number(yaw.toFixed(1));
+  // Finer than a degree: the PC may multiply this several times over.
+  if (yaw !== null) message.l = Number(yaw.toFixed(2));
+  const nod = lookPitch();
+  if (nod !== null) message.n = Number(nod.toFixed(2));
   message.r = raw;
   return JSON.stringify(message);
 }

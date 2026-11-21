@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import socket
 import sys
 
 import aiohttp
@@ -71,7 +72,7 @@ def drain(device):
     return events
 
 
-def test_phone_to_game_round_trip():
+def test_phone_to_game_round_trip(monkeypatch):
     async def scenario():
         events = []
         server, stop, task = await started_server(events)
@@ -147,6 +148,53 @@ def test_phone_to_game_round_trip():
                 assert server.look.angle == 0
                 await asyncio.sleep(0.3)
                 assert not server.wheel.buttons & (1 << 14)
+
+                # With the BeamNG.drive mod the angle goes out directly, past the axis's
+                # limit, and the axis stays still.
+                angles = []
+                listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                listener.bind(("127.0.0.1", 0))
+                listener.setblocking(False)
+                asyncio.get_running_loop().add_reader(
+                    listener, lambda: angles.append(float(listener.recv(64).split()[0])))
+                monkeypatch.setattr("phonecontrollers.server.BEAMNG_LOOK_ADDRESS",
+                                    listener.getsockname())
+                server.config["look"].update(output="beamng", gain=6.0, deadzone=0)
+                await ws.send_json({"l": -45.0})
+                await asyncio.sleep(0.05)
+                assert angles[-1] == pytest.approx(-270.0)
+                assert server.wheel.look == 0
+                await asyncio.sleep(0.3)
+                assert angles.count(angles[-1]) >= 2       # repeated while it holds still
+
+                # Nodding only counts with its switch on.
+                server.config["look"].update(nod=True, nodGain=2.0)
+                await ws.send_json({"l": -45.0, "n": 10.0})
+                await asyncio.sleep(0.05)
+                assert server.nod_angle == pytest.approx(20.0)
+                server.config["look"]["nod"] = False
+                await ws.send_json({"l": -45.0, "n": 10.0})
+                await asyncio.sleep(0.05)
+                assert server.nod_angle == 0.0
+
+                # The app's button recenters every phone, and the mod hears it; no camera
+                # reset button is pressed as the mod owns the view.
+                server.center_look_from_pc()
+                reply = await ws.receive_json()
+                while "lookCenter" not in reply:
+                    reply = await ws.receive_json()
+                assert angles[-1] == 0.0
+                assert not server.wheel.own_buttons & (1 << 14)
+
+                # Back on the axis: the view is let go.
+                await ws.send_json({"l": 10.0})
+                await asyncio.sleep(0.05)
+                assert angles[-1] == pytest.approx(60.0)
+                server.config["look"]["output"] = "axis"
+                await asyncio.sleep(0.05)
+                assert angles[-1] == 0.0
+                asyncio.get_running_loop().remove_reader(listener)
+                listener.close()
             await asyncio.sleep(0.2)
             # The phone left: nothing stays pressed.
             assert server.wheel.output("t") == 0

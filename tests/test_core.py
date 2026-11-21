@@ -2,15 +2,17 @@ import json
 import shutil
 import struct
 import subprocess
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from evdev import ecodes
 
-from phonecontrollers import config, curves, outgauge
+from phonecontrollers import config, curves, games, outgauge
 from phonecontrollers.device import (
-    LOOK_AXIS, PEDAL_MAX, ForceFeedback, LookAround, Wheel, look_target, parse_state,
+    LOOK_AXIS, PEDAL_MAX, ForceFeedback, LookAround, Wheel, look_target, nod_target_angle,
+    parse_state,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -89,6 +91,79 @@ def test_phone_curves_match():
     for name, points in curves.PRESETS.items():
         curve = curves.Curve(points)
         assert phone[name] == pytest.approx([curve(i / 40) for i in range(41)], abs=1e-9), name
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_phone_look_holds_through_quiet_sensors():
+    """Browsers can send no orientation events while the phone holds still; that isn't a lost
+    sensor. Runs the looking around part of static/app.js with a simulated phone."""
+    script = r"""
+    const fs = require("fs"); const vm = require("vm");
+    const source = fs.readFileSync(process.argv[1], "utf8");
+    const part = source.slice(source.indexOf("// ---------- looking around"),
+                              source.indexOf("// ---------- signal lever"));
+    const handlers = {};
+    let clock = 1000;
+    const element = { hidden: false, textContent: "" };
+    const sandbox = {
+      Math, console, performance: { now: () => clock },
+      window: { addEventListener: (type, fn) => { handlers[type] = fn; }, isSecureContext: true },
+      document: { getElementById: () => element },
+      shared: { look: { enabled: true, gain: 6, deadzone: 0, invert: false, axis: "top",
+                        smoothing: 0, settle: false, output: "beamng" } },
+      settings: { controls: { wheel: false, t: false } },
+      formatDegrees: (value) => `${value.toFixed(1)}`,
+      send: () => {},
+    };
+    vm.runInNewContext(part + `;this.lookYaw = lookYaw; this.showLook = showLook;
+      this.lookPitch = lookPitch; this.centerLook = centerLook;`, sandbox);
+    const gyro = (alpha, beta = 0) => handlers.deviceorientation(
+      { type: "deviceorientation", alpha, beta, gamma: 0 });
+    const compass = (alpha) => handlers.deviceorientationabsolute(
+      { type: "deviceorientationabsolute", alpha, beta: 0, gamma: 0 });
+    const out = {};
+    gyro(100);
+    gyro(70);                    // turned 30 degrees right
+    out.turned = sandbox.lookYaw();
+    clock += 3000;               // holds still: the browser goes quiet
+    out.quiet = sandbox.lookYaw();
+    compass(250);                // the compass disagrees, and mustn't take over
+    out.afterCompass = sandbox.lookYaw();
+    gyro(40);
+    out.turnedOn = sandbox.lookYaw();
+    gyro(40, 80);                // the chosen side now points up
+    out.steep = sandbox.lookYaw();
+    sandbox.showLook();
+    out.steepText = element.textContent;
+    gyro(40);
+    sandbox.showLook();
+    out.levelText = element.textContent;
+    out.nodOff = sandbox.lookPitch();
+    sandbox.shared.look.nod = true;
+    gyro(40, -20);               // top edge forward, nodding down
+    out.nodDown = sandbox.lookPitch();
+    out.nodYaw = sandbox.lookYaw();
+    gyro(40, 80);                // too steep for a heading, but the tilt is still good
+    out.nodSteep = sandbox.lookPitch();
+    sandbox.centerLook();
+    out.nodCentered = sandbox.lookPitch();
+    console.log(JSON.stringify(out));
+    """
+    result = subprocess.run(["node", "-e", script, str(ROOT / "static" / "app.js")],
+                            check=True, capture_output=True, text=True)
+    out = json.loads(result.stdout)
+    assert out["turned"] == pytest.approx(30.0)
+    assert out["quiet"] == pytest.approx(30.0)
+    assert out["afterCompass"] == pytest.approx(30.0)
+    assert out["turnedOn"] == pytest.approx(60.0)
+    assert out["steep"] == pytest.approx(60.0)  # holds the last direction rather than flicker
+    assert "too steep" in out["steepText"]
+    assert "too steep" not in out["levelText"]
+    assert out["nodOff"] is None
+    assert out["nodDown"] == pytest.approx(-20.0)
+    assert out["nodYaw"] == pytest.approx(60.0)  # nodding leaves the turn alone
+    assert out["nodSteep"] == pytest.approx(80.0)
+    assert out["nodCentered"] == pytest.approx(0.0)
 
 
 # ---------- settings ----------
@@ -201,6 +276,46 @@ def test_look_target_dead_zone_gain_and_invert():
     assert look_target(-15.0, options) == pytest.approx(-30.0)
     assert look_target(200.0, options) == 170.0
     assert look_target(15.0, {**options, "invert": True}) == pytest.approx(-30.0)
+
+
+def test_look_target_without_limit_reaches_past_half_a_turn():
+    options = {"gain": 6.0, "deadzone": 0, "invert": False}
+    assert look_target(45.0, options) == 170.0
+    assert look_target(45.0, options, limit=None) == pytest.approx(270.0)
+    assert look_target(-45.0, options, limit=None) == pytest.approx(-270.0)
+    assert look_target(45.0, {**options, "invert": True}, limit=None) == pytest.approx(-270.0)
+
+
+def test_nod_tilts_within_its_limit():
+    options = {"deadzone": 2, "nodGain": 2.0, "nodInvert": False}
+    assert nod_target_angle(1.0, options) == 0.0
+    assert nod_target_angle(12.0, options) == pytest.approx(20.0)
+    assert nod_target_angle(-12.0, options) == pytest.approx(-20.0)
+    assert nod_target_angle(80.0, options) == 85.0
+    assert nod_target_angle(12.0, {**options, "nodInvert": True}) == pytest.approx(-20.0)
+    assert parse_state({"n": -500})["n"] == -180.0
+    with pytest.raises(ValueError):
+        parse_state({"n": "nan"})
+
+
+def test_look_axis_and_output_settings_are_checked():
+    loaded = config.sanitize({"look": {"axis": "top", "output": "beamng", "smoothing": 900}})
+    assert (loaded["look"]["axis"], loaded["look"]["output"]) == ("top", "beamng")
+    assert loaded["look"]["smoothing"] == 200
+    rejected = config.sanitize({"look": {"axis": "sideways", "output": "telepathy"}})
+    assert (rejected["look"]["axis"], rejected["look"]["output"]) == ("back", "axis")
+
+
+def test_beamng_mod_install_and_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(games, "BEAMNG_DIR", tmp_path)
+    assert games.beamng_mod_state() == "missing"
+    target = games.install_beamng_mod()
+    assert target.parent == tmp_path / "current" / "mods"
+    assert games.beamng_mod_state() == "installed"
+    with zipfile.ZipFile(target) as archive:
+        assert "lua/ge/extensions/core/cameraModes/phoneControllersLook.lua" in archive.namelist()
+    target.write_bytes(b"not a zip")
+    assert games.beamng_mod_state() == "missing"
 
 
 def test_parse_state_reads_look():
