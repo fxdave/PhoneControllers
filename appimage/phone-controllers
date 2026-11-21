@@ -1,0 +1,6 @@
+#!/bin/sh
+# Starts the desktop app from the AppImage; "phone-controllers --headless" runs only the server.
+# The app's files sit in ../share/phone-controllers next to this script.
+HERE=$(dirname "$(readlink -f "$0")")
+export PYTHONPATH="$HERE/../share/phone-controllers${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m phonecontrollers "$@"
