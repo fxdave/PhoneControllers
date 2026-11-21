@@ -28,7 +28,9 @@ PYDIR=$(python3 -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')
 
 # libadwaita and GTK are loaded by PyGObject at run time, ssl is needed for the HTTPS server
 # (quick-sharun leaves it out unless asked), openssl creates the certificate, and the
-# compiled Python modules (Pillow, evdev, aiohttp...) need their libraries traced too.
+# compiled Python modules (Pillow, evdev, aiohttp...) need their libraries traced too. Only
+# modules from python-* packages are taken: the build image has others, like boost's MPI
+# bindings, whose libraries aren't installed and which would abort the deployment.
 # shellcheck disable=SC2046
 quick-sharun \
 	/usr/bin/phone-controllers \
@@ -37,7 +39,7 @@ quick-sharun \
 	/usr/lib/libgtk-4.so* \
 	"$PYDIR"/lib-dynload/_ssl.*.so \
 	"$PYDIR"/lib-dynload/_hashlib.*.so \
-	$(find "$PYDIR"/site-packages -name '*.so' -print) \
+	$(pacman -Qlq $(pacman -Qq | grep '^python-') | grep "^$PYDIR/site-packages/.*\.so$") \
 	/usr/share/phone-controllers
 
 mkdir -p ./AppDir/share/metainfo
