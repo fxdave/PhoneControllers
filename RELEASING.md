@@ -15,7 +15,17 @@
    flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream data/io.github.fxdave.PhoneControllers.metainfo.xml
    ```
 
-4. Commit, tag and push: `git tag v0.1.0 && git push origin main v0.1.0`.
+4. Commit, tag and push: `git tag v1.0.0 && git push origin main v1.0.0`. The tag makes the
+   `AppImage` workflow build the AppImages (x86_64 and aarch64) and attach them to the
+   tag's GitHub release, creating the release if it doesn't exist.
+
+## AppImage
+
+`appimage/` holds the build, which runs in an Arch Linux container on GitHub Actions
+(`.github/workflows/appimage.yml`) using
+[quick-sharun](https://github.com/pkgforge-dev/Anylinux-AppImages), which bundles everything
+down to the C library so the AppImage runs on any distro. Arch is used because the app needs
+libadwaita 1.7 or newer. Every push to `main` also builds it, as a workflow artifact.
 
 ## Building from GitHub
 

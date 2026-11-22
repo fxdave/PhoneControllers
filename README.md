@@ -40,7 +40,14 @@ so they may not see it at all. None has been tried yet; reports are welcome.
 
 ## Install
 
-Linux only. It isn't on Flathub; build the Flatpak:
+Linux only. Download the AppImage for your PC (`x86_64` or `aarch64`) from the
+[releases](https://github.com/fxdave/PhoneControllers/releases), then:
+
+```sh
+chmod +x Phone_Controllers-*.AppImage && ./Phone_Controllers-*.AppImage
+```
+
+It isn't on Flathub; to use a Flatpak instead, build it:
 
 ```sh
 git clone https://github.com/fxdave/PhoneControllers.git && cd PhoneControllers
