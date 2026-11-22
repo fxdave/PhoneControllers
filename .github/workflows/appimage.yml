@@ -37,6 +37,10 @@ jobs:
 
       - name: Build the AppImage
         shell: bash
+        env:
+          # The tag's version for a release, otherwise the commit; git describe isn't reliable
+          # in the container.
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           set -o pipefail
@@ -49,7 +53,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: AppImage-${{ matrix.arch }}
-          path: dist
+          path: dist/*.AppImage*
 
   release:
     name: Attach to the release
